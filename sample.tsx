@@ -1,6 +1,9 @@
-import React from 'react';
 
-export function UserProfile({ name }) {
+type UserProfileProps = {
+  name: string;
+};
+
+export function UserProfile({ name }: UserProfileProps) {
   let visits = 0;
 
   // INVALID: Impurity Violation (Mutating directly during render phase)
