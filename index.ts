@@ -4,11 +4,11 @@ async function main() {
   const traverseModule = await import('@babel/traverse');
 
   const fs = fsModule.default;
-  const traverse = traverseModule.default || traverseModule;
+  const traverse = traverseModule.default;
 
   console.log('🔍 [pure-react-check] Running Scope-Aware Scan...\n');
 
-  const code = fs.readFileSync('./sample.jsx', 'utf-8');
+  const code = fs.readFileSync('./sample.tsx', 'utf-8');
 
   const ast = parser.parse(code, {
     sourceType: 'module',
@@ -21,7 +21,7 @@ async function main() {
  * Helper: Checks if a given function path represents a React Component.
  * React components typically start with a capital letter (e.g., UserProfile).
  */
-  function isReactComponent(funcPath) {
+  function isReactComponent(funcPath: any): boolean {
     if (!funcPath) return false;
 
     // Case 1: function UserProfile() {}
@@ -43,7 +43,7 @@ async function main() {
   }
 
   traverse(ast, {
-    AssignmentExpression(path) {
+    AssignmentExpression(path: any) {
       // 1. Find the closest enclosing function for this assignment
       const enclosingFunction = path.getFunctionParent();
 
