@@ -4,13 +4,18 @@
   "description": "Static analysis CLI for React component purity and compiler readiness",
   "type": "module",
   "main": "./dist/index.js",
+  "module": "./dist/index.js",
   "bin": {
     "pure-react-check": "./bin/pure-react-check.js"
   },
   "files": [
     "dist",
-    "bin"
+    "bin",
+    "README.md"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "dev": "tsx src/index.ts",
     "build": "tsup src/index.ts --format esm --clean",
@@ -23,9 +28,10 @@
     "react-compiler",
     "static-analysis",
     "ast",
-    "cli"
+    "cli",
+    "purity"
   ],
-  "author": "",
+  "author": "mukarram mahmoud",
   "license": "ISC",
   "packageManager": "pnpm@10.19.0",
   "dependencies": {
@@ -33,13 +39,13 @@
     "@babel/traverse": "^8.0.4",
     "@babel/types": "^8.0.4",
     "fast-glob": "^3.3.3",
-    "picocolors": "^1.1.1",
-    "react": "^19.2.8"
+    "picocolors": "^1.1.1"
   },
   "devDependencies": {
     "@types/babel__traverse": "^7.28.0",
     "@types/node": "^26.2.0",
     "@types/react": "^19.2.18",
+    "react": "^19.2.8",
     "tsup": "^8.5.1",
     "tsx": "^4.23.12",
     "typescript": "^7.0.2"
