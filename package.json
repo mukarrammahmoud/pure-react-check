@@ -1,13 +1,30 @@
 {
   "name": "pure-react-check",
   "version": "1.0.0",
-  "description": "",
-  "main": "src/index.ts",
+  "description": "Static analysis CLI for React component purity and compiler readiness",
+  "type": "module",
+  "main": "./dist/index.js",
+  "bin": {
+    "pure-react-check": "./bin/pure-react-check.js"
+  },
+  "files": [
+    "dist",
+    "bin"
+  ],
   "scripts": {
     "dev": "tsx src/index.ts",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "tsup src/index.ts --format esm --clean",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "pnpm build",
+    "test": "pnpm typecheck"
   },
-  "keywords": [],
+  "keywords": [
+    "react",
+    "react-compiler",
+    "static-analysis",
+    "ast",
+    "cli"
+  ],
   "author": "",
   "license": "ISC",
   "packageManager": "pnpm@10.19.0",
@@ -16,12 +33,14 @@
     "@babel/traverse": "^8.0.4",
     "@babel/types": "^8.0.4",
     "fast-glob": "^3.3.3",
+    "picocolors": "^1.1.1",
     "react": "^19.2.8"
   },
   "devDependencies": {
     "@types/babel__traverse": "^7.28.0",
     "@types/node": "^26.2.0",
     "@types/react": "^19.2.18",
+    "tsup": "^8.5.1",
     "tsx": "^4.23.12",
     "typescript": "^7.0.2"
   }

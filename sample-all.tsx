@@ -17,7 +17,7 @@ export function AllRulesSample({ props, items }: { props: { user: { name: string
   function NestedChild() {
     return <span>Invalid nested component</span>;
   }
-  function TodoList({ items }) {
+  function TodoList({ items }: { items: Array<{ id: number; text: string }> }) {
     // VIOLATION: Directly mutating the items prop during render
     items.push({ id: 99, text: 'New Item' }); 
   
@@ -51,7 +51,7 @@ export function AllRulesSample({ props, items }: { props: { user: { name: string
       <ModuleChild />
       <NestedChild />
       <NestedArrow />
-      <TodoList />
+      <TodoList items={[]} />
       <p>{count + (state.ready ? id : 0)}</p>
     </div>
   );

@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>pure-react-check Report</title><style>
+:root{color-scheme:dark;--bg:#0b1020;--panel:#121a2b;--panel2:#18243a;--text:#edf2ff;--muted:#9aa8c2;--green:#45d483;--red:#ff6b7a;--line:#263653;--accent:#7aa7ff}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px/1.55 Inter,ui-sans-serif,system-ui,sans-serif}main{max-width:1100px;margin:0 auto;padding:48px 24px 64px}header{margin-bottom:32px}h1{font-size:clamp(28px,5vw,44px);margin:0 0 8px;letter-spacing:-.02em}h2{font-size:18px;margin:0}.subtitle{color:var(--muted);margin:0}.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:36px}.card,.file-group,.errors,.empty{background:var(--panel);border:1px solid var(--line);border-radius:12px}.card{padding:20px}.label{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.08em}.value{display:block;font-size:28px;font-weight:700;margin-top:7px}.good{color:var(--green)}.bad{color:var(--red)}.file-group{margin:16px 0;overflow:hidden}.file-group h2{padding:17px 20px;background:var(--panel2);border-bottom:1px solid var(--line);font-family:ui-monospace,SFMono-Regular,monospace;font-size:14px}.file-count{float:right;color:var(--muted);font:12px ui-sans-serif,system-ui,sans-serif}.violation{padding:17px 20px;border-bottom:1px solid var(--line)}.violation:last-child{border-bottom:0}.meta{display:flex;gap:10px;align-items:center}.badge{background:#612b3a;color:#ffb3bd;border:1px solid #914456;border-radius:5px;padding:3px 8px;font:12px ui-monospace,monospace}.line{color:#ffd166;font:12px ui-monospace,monospace}.message{margin:10px 0 3px}.fix{color:var(--muted);margin:0}.fix strong{color:var(--accent)}.empty{text-align:center;padding:64px 20px}.check{display:grid;place-items:center;width:56px;height:56px;margin:0 auto 16px;border-radius:50%;background:#173e30;color:var(--green);font-size:32px}.empty p{color:var(--muted)}.errors{padding:18px 20px;margin-top:18px;border-color:#914456}.errors h2{color:var(--red);margin-bottom:8px}.errors p{color:var(--muted);margin:5px 0}@media(max-width:760px){.cards{grid-template-columns:repeat(2,1fr)}main{padding:30px 14px 48px}}@media(max-width:420px){.cards{grid-template-columns:1fr 1fr}.value{font-size:22px}}
+</style></head><body><main><header><h1>&#128269; pure-react-check Report</h1><p class="subtitle">React Compiler purity and readiness analysis</p></header>
+<div class="cards"><div class="card"><span class="label">Readiness Score</span><span class="value good">88.2%</span></div><div class="card"><span class="label">Scanned Files</span><span class="value">17</span></div><div class="card"><span class="label">Clean Files</span><span class="value good">15</span></div><div class="card"><span class="label">Violations</span><span class="value bad">19</span></div></div>
+<section><h2>Detailed Findings</h2>
+    <section class="file-group">
+      <h2>sample-all.tsx <span class="file-count">16 violations</span></h2>
+      
+        <article class="violation">
+          <div class="meta"><span class="badge">no-render-mutation</span><span class="line">Line 13</span></div>
+          <p class="message">Mutates a value with &#39;=&#39; directly during render.</p>
+          <p class="fix"><strong>Fix:</strong> Move the mutation into an event handler or effect.</p>
+        </article>
+        <article class="violation">
+          <div class="meta"><span class="badge">no-render-mutation</span><span class="line">Line 33</span></div>
+          <p class="message">Mutates a value with &#39;=&#39; directly during render.</p>
+          <p class="fix"><strong>Fix:</strong> Move the mutation into an event handler or effect.</p>
+        </article>
+        <article class="violation">
+          <div class="meta"><span class="badge">no-impure-calls</span><span class="line">Line 32</span></div>
+          <p class="message">Calls Math.random() directly during render.</p>
+          <p class="fix"><strong>Fix:</strong> Move the call into an event handler or an appropriate effect/memoization boundary.</p>
+        </article>
+        <article class="violation">
+          <div class="meta"><span class="badge">no-set-state-in-render</span><span class="line">Line 11</span></div>
+          <p class="message">Calls state updater &#39;setCount&#39; during render.</p>
+          <p class="fix"><strong>Fix:</strong> Call state updaters from an event handler or an effect, not during render.</p>
+        </article>
+        <article class="violation">
+          <div class="meta"><span class="badge">no-set-state-in-render</span><span class="line">Line 12</span></div>
+          <p class="message">Calls state updater &#39;dispatch&#39; during render.</p>
+          <p class="fix"><strong>Fix:</strong> Call state updaters from an event handler or an effect, not during render.</p>
+        </article>
+        <article class="violation">
+          <div class="meta"><span class="badge">no-prop-state-mutation</span><span class="line">Line 13</span></div>
+          <p class="message">Mutates a prop or state object during render.</p>
+          <p class="fix"><strong>Fix:</strong> Create a new shallow copy before changing the object or array.</p>
+        </article>
+        <article class="violation">
+          <div class="meta"><span class="badge">no-prop-state-mutation</span><span class="line">Line 14</span></div>
+          <p class="message">Mutates a prop or state collection during render.</p>
+          <p class="fix"><strong>Fix:</strong> Create a new shallow copy before changing the object or array.</p>
+        </article>
+        <article class="violation">
+          <div class="meta"><span class="badge">no-prop-state-mutation</span><span class="line">Line 15</span></div>
+          <p class="message">Deletes a prop or state property during render.</p>
+          <p class="fix"><strong>Fix:</strong> Create a new shallow copy and omit the property instead.</p>
+        </article>
+        <article class="violation">
+          <div class="meta"><span class="badge">no-prop-state-mutation</span><span class="line">Line 22</span></div>
+          <p class="message">Mutates a prop or state collection during render.</p>
+          <p class="fix"><strong>Fix:</strong> Create a new shallow copy before changing the object or array.</p>
+        </article>
+        <article class="violation">
+          <div class="meta"><span class="badge">no-nested-components</span><span class="line">Line 17</span></div>
+          <p class="message">Defines component &#39;NestedChild&#39; inside another component.</p>
+          <p class="fix"><strong>Fix:</strong> Move the nested component to module scope.</p>
+        </article>
+        <article class="violation">
+          <div class="meta"><span class="badge">no-nested-components</span><span class="line">Line 20</span></div>
+          <p class="message">Defines component &#39;TodoList&#39; inside another component.</p>
+          <p class="fix"><strong>Fix:</strong> Move the nested component to module scope.</p>
+        </article>
+        <article class="violation">
+          <div class="meta"><span class="badge">no-nested-components</span><span class="line">Line 31</span></div>
+          <p class="message">Defines an arrow-function component inside another component.</p>
+          <p class="fix"><strong>Fix:</strong> Move the nested component to module scope.</p>
+        </article>
+        <article class="violation">
+          <div class="meta"><span class="badge">no-dom-globals-in-render</span><span class="line">Line 33</span></div>
+          <p class="message">Reads or accesses a browser DOM global during render.</p>
+          <p class="fix"><strong>Fix:</strong> Move browser global access into useEffect or an event handler.</p>
+        </article>
+        <article class="violation">
+          <div class="meta"><span class="badge">no-dom-globals-in-render</span><span class="line">Line 34</span></div>
+          <p class="message">Calls a browser side effect on localStorage during render.</p>
+          <p class="fix"><strong>Fix:</strong> Move side effects to useEffect or an event handler.</p>
+        </article>
+        <article class="violation">
+          <div class="meta"><span class="badge">no-dom-globals-in-render</span><span class="line">Line 35</span></div>
+          <p class="message">Calls a browser side effect on window during render.</p>
+          <p class="fix"><strong>Fix:</strong> Move side effects to useEffect or an event handler.</p>
+        </article>
+        <article class="violation">
+          <div class="meta"><span class="badge">no-dom-globals-in-render</span><span class="line">Line 36</span></div>
+          <p class="message">Calls a browser side effect during render.</p>
+          <p class="fix"><strong>Fix:</strong> Move side effects to useEffect or an event handler.</p>
+        </article>
+    </section>
+    <section class="file-group">
+      <h2>sample.tsx <span class="file-count">3 violations</span></h2>
+      
+        <article class="violation">
+          <div class="meta"><span class="badge">no-render-mutation</span><span class="line">Line 12</span></div>
+          <p class="message">Mutates a value with &#39;=&#39; directly during render.</p>
+          <p class="fix"><strong>Fix:</strong> Move the mutation into an event handler or effect.</p>
+        </article>
+        <article class="violation">
+          <div class="meta"><span class="badge">no-impure-calls</span><span class="line">Line 14</span></div>
+          <p class="message">Calls Math.random() directly during render.</p>
+          <p class="fix"><strong>Fix:</strong> Move the call into an event handler or an appropriate effect/memoization boundary.</p>
+        </article>
+        <article class="violation">
+          <div class="meta"><span class="badge">no-impure-calls</span><span class="line">Line 15</span></div>
+          <p class="message">Calls Date.now() directly during render.</p>
+          <p class="fix"><strong>Fix:</strong> Move the call into an event handler or an appropriate effect/memoization boundary.</p>
+        </article>
+    </section></section></main></body></html>
