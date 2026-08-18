@@ -1,6 +1,6 @@
 {
   "name": "pure-react-check",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Static analysis CLI for React component purity and compiler readiness",
   "type": "module",
   "main": "./dist/index.js",
