@@ -2,7 +2,7 @@ import { runCli } from './cli.js';
 
 runCli().then(
   (exitCode) => {
-    process.exit(exitCode);
+    process.exitCode = exitCode;
   },
   (error: unknown) => {
     console.error(error);
