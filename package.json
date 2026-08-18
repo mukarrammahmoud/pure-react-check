@@ -2,9 +2,9 @@
   "name": "pure-react-check",
   "version": "1.0.0",
   "description": "",
-  "main": "index.ts",
+  "main": "src/index.ts",
   "scripts": {
-    "dev": "tsx index.ts",
+    "dev": "tsx src/index.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -15,6 +15,7 @@
     "@babel/parser": "^8.0.4",
     "@babel/traverse": "^8.0.4",
     "@babel/types": "^8.0.4",
+    "fast-glob": "^3.3.3",
     "react": "^19.2.8"
   },
   "devDependencies": {
