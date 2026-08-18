@@ -1,5 +1,4 @@
-import { noImpureCallsRule } from './rules/no-impure-calls.js';
-import { noRenderMutationRule } from './rules/no-render-mutation.js';
+import { allRules } from './rules/index.js';
 import type { AnalysisRule, Violation } from './rules/types.js';
 
 export interface ScanError {
@@ -14,7 +13,7 @@ export interface ScanResult {
 }
 
 const SOURCE_PATTERN = '**/*.{js,jsx,ts,tsx}';
-const rules: AnalysisRule[] = [noRenderMutationRule, noImpureCallsRule];
+const rules: AnalysisRule[] = allRules;
 
 function normalizePath(filePath: string): string {
   return filePath.replaceAll('\\', '/');
