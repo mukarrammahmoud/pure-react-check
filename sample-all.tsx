@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 function ModuleChild() {
   return <span>Valid module component</span>;
@@ -7,6 +7,16 @@ function ModuleChild() {
 export function AllRulesSample({ props, items }: { props: { user: { name: string }; id?: string }; items: string[] }) {
   const [count, setCount] = useState(0);
   const [state, dispatch] = useState({ ready: false });
+  const renderRef = useRef(0);
+  const playerRef = useRef<{ play: () => void } | null>(null);
+
+  // VIOLATION: no-ref-read-in-render
+  const currentRender = renderRef.current;
+
+  // VALID: lazy ref initialization is allowed
+  if (playerRef.current === null) {
+    playerRef.current = { play: () => console.log('play') };
+  }
 
   setCount((value) => value + 1);
   dispatch({ ready: true });
@@ -39,11 +49,15 @@ export function AllRulesSample({ props, items }: { props: { user: { name: string
   useEffect(() => {
     setCount((value) => value + 1);
     document.title = 'valid effect';
+    // VALID: reading ref inside useEffect
+    console.log(renderRef.current);
   }, []);
 
   const handleClick = () => {
     setCount((value) => value + 1);
     Date.now();
+    // VALID: reading ref inside event handler
+    console.log(renderRef.current);
   };
 
   return (
@@ -52,7 +66,8 @@ export function AllRulesSample({ props, items }: { props: { user: { name: string
       <NestedChild />
       <NestedArrow />
       <TodoList items={[]} />
-      <p>{count + (state.ready ? id : 0)}</p>
+      <p>{count + (state.ready ? id : 0) + currentRender}</p>
     </div>
   );
 }
+

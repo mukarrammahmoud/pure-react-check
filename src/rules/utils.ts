@@ -1,24 +1,161 @@
 import type { NodePath } from '@babel/traverse' with { 'resolution-mode': 'import' };
 import type * as t from '@babel/types' with { 'resolution-mode': 'import' };
 
+function getFunctionName(path: NodePath<t.Function>): string | null {
+  if ('id' in path.node && path.node.id && 'name' in path.node.id) {
+    return path.node.id.name;
+  }
+  if (path.parentPath?.isVariableDeclarator()) {
+    const id = path.parentPath.node.id;
+    if (id.type === 'Identifier') return id.name;
+  }
+  if (path.parentPath?.isAssignmentExpression()) {
+    const left = path.parentPath.node.left;
+    if (left.type === 'Identifier') return left.name;
+    if (left.type === 'MemberExpression' && left.property.type === 'Identifier') {
+      return left.property.name;
+    }
+  }
+  return null;
+}
+
+
 export function isReactComponent(funcPath: NodePath<t.Function>): boolean {
-  if (funcPath.isFunctionDeclaration()) {
-    const name = funcPath.node.id?.name;
-    return Boolean(name && /^[A-Z]/.test(name));
+  const name = getFunctionName(funcPath);
+  if (name && /^[A-Z]/.test(name)) return true;
+
+  if (funcPath.parentPath?.isCallExpression()) {
+    const callee = funcPath.parentPath.node.callee;
+    let calleeName = '';
+    if (callee.type === 'Identifier') calleeName = callee.name;
+    else if (callee.type === 'MemberExpression' && callee.property.type === 'Identifier') {
+      calleeName = callee.property.name;
+    }
+    if (['memo', 'forwardRef'].includes(calleeName)) return true;
   }
 
-  if (funcPath.isArrowFunctionExpression() || funcPath.isFunctionExpression()) {
-    const parent = funcPath.parentPath;
-    if (!parent?.isVariableDeclarator()) return false;
+  return false;
+}
 
-    const idPath = parent.get('id');
-    return idPath.isIdentifier() && /^[A-Z]/.test(idPath.node.name);
+export function isReactComponentOrHook(funcPath: NodePath<t.Function>): boolean {
+  const name = getFunctionName(funcPath);
+  if (name && (/^[A-Z]/.test(name) || /^use[A-Z]/.test(name))) {
+    return true;
+  }
+
+  if (funcPath.parentPath?.isCallExpression()) {
+    const callee = funcPath.parentPath.node.callee;
+    let calleeName = '';
+    if (callee.type === 'Identifier') calleeName = callee.name;
+    else if (callee.type === 'MemberExpression' && callee.property.type === 'Identifier') {
+      calleeName = callee.property.name;
+    }
+    if (['memo', 'forwardRef'].includes(calleeName)) return true;
+  }
+
+  return false;
+}
+
+const DEFERRED_HOOKS = new Set([
+  'useEffect',
+  'useLayoutEffect',
+  'useInsertionEffect',
+  'useCallback',
+]);
+
+export function isRenderPhase(path: NodePath<t.Node>): boolean {
+  let current: NodePath<t.Node> | null = path.parentPath;
+
+  while (current) {
+    if (current.isJSXAttribute()) {
+      const name = current.node.name;
+      if (name.type === 'JSXIdentifier' && /^on[A-Z]/.test(name.name)) {
+        return false;
+      }
+    }
+
+    if (current.isCallExpression()) {
+      const callee = current.node.callee;
+      let hookName = '';
+      if (callee.type === 'Identifier') hookName = callee.name;
+      else if (callee.type === 'MemberExpression' && callee.property.type === 'Identifier') {
+        hookName = callee.property.name;
+      }
+      if (DEFERRED_HOOKS.has(hookName)) {
+        return false;
+      }
+    }
+
+    if (current.isFunction()) {
+      const funcName = getFunctionName(current);
+
+      if (funcName && /^(handle|on)[A-Z]/.test(funcName)) {
+        return false;
+      }
+
+      if (isReactComponentOrHook(current)) {
+        return true;
+      }
+    }
+
+    current = current.parentPath;
   }
 
   return false;
 }
 
 export function getRenderComponent(path: NodePath<t.Node>): NodePath<t.Function> | null {
-  const functionPath = path.getFunctionParent();
-  return functionPath && isReactComponent(functionPath) ? functionPath : null;
+  if (!isRenderPhase(path)) return null;
+
+  let current: NodePath<t.Node> | null = path;
+  while (current) {
+    if (current.isFunction() && isReactComponentOrHook(current)) {
+      return current;
+    }
+    current = current.parentPath;
+  }
+
+  return null;
 }
+
+export function isLazyRefInit(path: NodePath<t.Node>): boolean {
+  const ifStmt = path.findParent((p) => p.isIfStatement());
+  if (!ifStmt || !ifStmt.isIfStatement()) return false;
+
+  const testPath = ifStmt.get('test');
+  const consequentPath = ifStmt.get('consequent');
+
+  let testChecksRef = false;
+  testPath.traverse({
+    MemberExpression(memberPath) {
+      if (
+        !memberPath.node.computed &&
+        memberPath.node.property.type === 'Identifier' &&
+        memberPath.node.property.name === 'current'
+      ) {
+        testChecksRef = true;
+      }
+    },
+  });
+
+  let consequentAssignsRef = false;
+  consequentPath.traverse({
+    AssignmentExpression(assignPath) {
+      const left = assignPath.node.left;
+      if (
+        left.type === 'MemberExpression' &&
+        !left.computed &&
+        left.property.type === 'Identifier' &&
+        left.property.name === 'current'
+      ) {
+        consequentAssignsRef = true;
+      }
+    },
+  });
+
+  return testChecksRef && consequentAssignsRef;
+}
+
+
+
+

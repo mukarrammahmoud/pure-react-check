@@ -6,8 +6,9 @@ It parses source code with Babel, reports the exact file and line for each issue
 
 ## What It Checks
 
-The v1 ruleset detects:
+The ruleset detects:
 
+- `no-ref-read-in-render`: reads of `ref.current` during render (breaks React Compiler memoization).
 - `no-render-mutation`: assignments and `ref.current` mutations during render.
 - `no-impure-calls`: calls such as `Math.random()` and `Date.now()` during render.
 - `no-set-state-in-render`: direct `setState`-style or `dispatch(...)` calls during render.
@@ -15,7 +16,8 @@ The v1 ruleset detects:
 - `no-nested-components`: component definitions inside another component.
 - `no-dom-globals-in-render`: render-time access to `document`, `window`, storage APIs, `fetch`, and similar browser side effects.
 
-Calls inside event handlers, effects, and nested callbacks are excluded where appropriate.
+Calls inside event handlers, effects, and nested callbacks are excluded where appropriate. Lazy ref initialization patterns (`if (ref.current === null) ref.current = ...`) are supported.
+
 
 ## Supported Files
 

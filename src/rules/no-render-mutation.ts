@@ -1,7 +1,7 @@
 import type { NodePath } from '@babel/traverse' with { 'resolution-mode': 'import' };
 import type * as t from '@babel/types' with { 'resolution-mode': 'import' };
 import type { AnalysisRule } from './types.js';
-import { getRenderComponent } from './utils.js';
+import { getRenderComponent, isLazyRefInit } from './utils.js';
 
 function isRefCurrentAssignment(path: NodePath<t.AssignmentExpression>): boolean {
   const left = path.node.left;
@@ -18,6 +18,7 @@ export const noRenderMutationRule: AnalysisRule = {
   visitors: (context) => ({
     AssignmentExpression(path: NodePath<t.AssignmentExpression>) {
       if (!getRenderComponent(path)) return;
+      if (isLazyRefInit(path)) return;
 
       const refMutation = isRefCurrentAssignment(path);
       context.report(path, {
@@ -32,3 +33,4 @@ export const noRenderMutationRule: AnalysisRule = {
     },
   }),
 };
+
