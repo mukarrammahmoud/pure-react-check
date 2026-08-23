@@ -7,10 +7,9 @@ import { getRenderComponent } from "./utils.js";
 
 function isStateUpdater(path: NodePath<t.CallExpression>): boolean {
   const callee = path.node.callee;
-  return (
-    callee.type === "Identifier" &&
-    (callee.name === "dispatch" || /^set[A-Z]/.test(callee.name))
-  );
+  if (callee.type !== "Identifier") return false;
+  if (callee.name === "setTimeout" || callee.name === "setInterval") return false;
+  return callee.name === "dispatch" || /^set[A-Z]/.test(callee.name);
 }
 
 export const noSetStateInRenderRule: AnalysisRule = {
