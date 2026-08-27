@@ -1,0 +1,466 @@
+{
+  "generatedAt": "2026-08-27T18:29:49.663Z",
+  "target": "sample-all.tsx",
+  "files": [
+    "sample-all.tsx"
+  ],
+  "components": [
+    {
+      "name": "ModuleChild",
+      "filePath": "sample-all.tsx",
+      "line": 3,
+      "status": "optimized",
+      "violations": [],
+      "directives": [],
+      "primaryBailoutReason": null
+    },
+    {
+      "name": "AllRulesSample",
+      "filePath": "sample-all.tsx",
+      "line": 7,
+      "status": "will-bailout",
+      "violations": [
+        {
+          "rule": "no-render-mutation",
+          "filePath": "sample-all.tsx",
+          "line": 23,
+          "message": "Mutates a value with '=' directly during render.",
+          "recommendation": "Move the mutation into an event handler or effect.",
+          "bailoutCategory": "mutation-during-render",
+          "compilerReason": "Encountered a mutation of a value that may be shared: mutating a value in a reactive scope invalidates the compiler's ability to create stable memoized outputs.",
+          "severity": "definite",
+          "blockedOptimization": "Reactive-scope creation — the compiler cannot create a stable memoized output if the value is mutated during render."
+        },
+        {
+          "rule": "no-ref-read-in-render",
+          "filePath": "sample-all.tsx",
+          "line": 14,
+          "message": "Reads 'ref.current' during render. Component render must be pure and deterministic.",
+          "recommendation": "Move ref access to an effect (useEffect), an event handler, or use state (useState) instead if you need to trigger a re-render.",
+          "bailoutCategory": "ref-access-in-render",
+          "compilerReason": "Reading ref.current during render: refs are mutable containers whose values are invisible to the compiler's dependency tracking. The compiler cannot include ref values in reactive scopes, so a component that reads refs during render will be bailed out to avoid producing stale memoized output.",
+          "severity": "definite",
+          "blockedOptimization": "Reactive-scope dependency analysis — ref.current is opaque to the compiler's dataflow graph; it cannot reason about when re-memoization is needed."
+        },
+        {
+          "rule": "no-set-state-in-render",
+          "filePath": "sample-all.tsx",
+          "line": 21,
+          "message": "Calls state updater 'setCount' during render.",
+          "recommendation": "Call state updaters from an event handler or an effect, not during render.",
+          "bailoutCategory": "set-state-in-render",
+          "compilerReason": "setState (or a dispatcher returned by useState) is called unconditionally during the render phase. Calling setState during render creates an infinite re-render loop; the compiler will not attempt to memoize a component that exhibits this pattern.",
+          "severity": "definite",
+          "blockedOptimization": "Full-component memoization — setState in render is an infinite-loop hazard; the compiler refuses to optimise such components."
+        },
+        {
+          "rule": "no-set-state-in-render",
+          "filePath": "sample-all.tsx",
+          "line": 22,
+          "message": "Calls state updater 'dispatch' during render.",
+          "recommendation": "Call state updaters from an event handler or an effect, not during render.",
+          "bailoutCategory": "set-state-in-render",
+          "compilerReason": "setState (or a dispatcher returned by useState) is called unconditionally during the render phase. Calling setState during render creates an infinite re-render loop; the compiler will not attempt to memoize a component that exhibits this pattern.",
+          "severity": "definite",
+          "blockedOptimization": "Full-component memoization — setState in render is an infinite-loop hazard; the compiler refuses to optimise such components."
+        },
+        {
+          "rule": "no-prop-state-mutation",
+          "filePath": "sample-all.tsx",
+          "line": 23,
+          "message": "Mutates a prop or state object during render.",
+          "recommendation": "Create a new shallow copy before changing the object or array.",
+          "bailoutCategory": "mutation-during-render",
+          "compilerReason": "Found a mutation of a prop or state value. Props and state must be treated as immutable during render; the compiler relies on referential stability to determine which reactive scopes can be skipped.",
+          "severity": "definite",
+          "blockedOptimization": "Auto-memoization of props — mutating props breaks the compiler's referential-equality assumption that drives skip decisions."
+        },
+        {
+          "rule": "no-prop-state-mutation",
+          "filePath": "sample-all.tsx",
+          "line": 24,
+          "message": "Mutates a prop or state collection during render.",
+          "recommendation": "Create a new shallow copy before changing the object or array.",
+          "bailoutCategory": "mutation-during-render",
+          "compilerReason": "Found a mutation of a prop or state value. Props and state must be treated as immutable during render; the compiler relies on referential stability to determine which reactive scopes can be skipped.",
+          "severity": "definite",
+          "blockedOptimization": "Auto-memoization of props — mutating props breaks the compiler's referential-equality assumption that drives skip decisions."
+        },
+        {
+          "rule": "no-prop-state-mutation",
+          "filePath": "sample-all.tsx",
+          "line": 25,
+          "message": "Deletes a prop or state property during render.",
+          "recommendation": "Create a new shallow copy and omit the property instead.",
+          "bailoutCategory": "mutation-during-render",
+          "compilerReason": "Found a mutation of a prop or state value. Props and state must be treated as immutable during render; the compiler relies on referential stability to determine which reactive scopes can be skipped.",
+          "severity": "definite",
+          "blockedOptimization": "Auto-memoization of props — mutating props breaks the compiler's referential-equality assumption that drives skip decisions."
+        }
+      ],
+      "directives": [],
+      "primaryBailoutReason": "Reading ref.current during render: refs are mutable containers whose values are invisible to the compiler's dependency tracking. The compiler cannot include ref values in reactive scopes, so a component that reads refs during render will be bailed out to avoid producing stale memoized output."
+    },
+    {
+      "name": "NestedChild",
+      "filePath": "sample-all.tsx",
+      "line": 27,
+      "status": "will-bailout",
+      "violations": [
+        {
+          "rule": "no-nested-components",
+          "filePath": "sample-all.tsx",
+          "line": 27,
+          "message": "Defines component 'NestedChild' inside another component.",
+          "recommendation": "Move the nested component to module scope.",
+          "bailoutCategory": "nested-component-definition",
+          "compilerReason": "A React component is defined inside another component's render body. Nested component definitions create a new function identity on every render, which defeats memoization. The compiler bails out of optimising the inner component and may also bail out of the outer one.",
+          "severity": "definite",
+          "blockedOptimization": "Inner-component memoization — a new function reference on every render means the compiler's cached output is always stale for the inner component."
+        }
+      ],
+      "directives": [],
+      "primaryBailoutReason": "A React component is defined inside another component's render body. Nested component definitions create a new function identity on every render, which defeats memoization. The compiler bails out of optimising the inner component and may also bail out of the outer one."
+    },
+    {
+      "name": "TodoList",
+      "filePath": "sample-all.tsx",
+      "line": 30,
+      "status": "will-bailout",
+      "violations": [
+        {
+          "rule": "no-prop-state-mutation",
+          "filePath": "sample-all.tsx",
+          "line": 32,
+          "message": "Mutates a prop or state collection during render.",
+          "recommendation": "Create a new shallow copy before changing the object or array.",
+          "bailoutCategory": "mutation-during-render",
+          "compilerReason": "Found a mutation of a prop or state value. Props and state must be treated as immutable during render; the compiler relies on referential stability to determine which reactive scopes can be skipped.",
+          "severity": "definite",
+          "blockedOptimization": "Auto-memoization of props — mutating props breaks the compiler's referential-equality assumption that drives skip decisions."
+        },
+        {
+          "rule": "no-nested-components",
+          "filePath": "sample-all.tsx",
+          "line": 30,
+          "message": "Defines component 'TodoList' inside another component.",
+          "recommendation": "Move the nested component to module scope.",
+          "bailoutCategory": "nested-component-definition",
+          "compilerReason": "A React component is defined inside another component's render body. Nested component definitions create a new function identity on every render, which defeats memoization. The compiler bails out of optimising the inner component and may also bail out of the outer one.",
+          "severity": "definite",
+          "blockedOptimization": "Inner-component memoization — a new function reference on every render means the compiler's cached output is always stale for the inner component."
+        }
+      ],
+      "directives": [],
+      "primaryBailoutReason": "A React component is defined inside another component's render body. Nested component definitions create a new function identity on every render, which defeats memoization. The compiler bails out of optimising the inner component and may also bail out of the outer one."
+    },
+    {
+      "name": "NestedArrow",
+      "filePath": "sample-all.tsx",
+      "line": 41,
+      "status": "will-bailout",
+      "violations": [
+        {
+          "rule": "no-render-mutation",
+          "filePath": "sample-all.tsx",
+          "line": 43,
+          "message": "Mutates a value with '=' directly during render.",
+          "recommendation": "Move the mutation into an event handler or effect.",
+          "bailoutCategory": "mutation-during-render",
+          "compilerReason": "Encountered a mutation of a value that may be shared: mutating a value in a reactive scope invalidates the compiler's ability to create stable memoized outputs.",
+          "severity": "definite",
+          "blockedOptimization": "Reactive-scope creation — the compiler cannot create a stable memoized output if the value is mutated during render."
+        },
+        {
+          "rule": "no-impure-calls",
+          "filePath": "sample-all.tsx",
+          "line": 42,
+          "message": "Calls Math.random() directly during render.",
+          "recommendation": "Move the call into an event handler or an appropriate effect/memoization boundary.",
+          "bailoutCategory": "side-effect-in-render",
+          "compilerReason": "Detected a call to an impure function (e.g. Math.random, Date.now) during render. Impure calls produce different values on every invocation; the compiler cannot safely memoize a reactive scope whose output depends on a value that changes non-deterministically.",
+          "severity": "definite",
+          "blockedOptimization": "Deterministic reactive-scope memoization — the compiler assumes render is a pure function of its inputs; impure calls violate that assumption."
+        },
+        {
+          "rule": "no-impure-calls",
+          "filePath": "sample-all.tsx",
+          "line": 48,
+          "message": "Calls Math.random() directly during render.",
+          "recommendation": "Move the call into an event handler or an appropriate effect/memoization boundary.",
+          "bailoutCategory": "side-effect-in-render",
+          "compilerReason": "Detected a call to an impure function (e.g. Math.random, Date.now) during render. Impure calls produce different values on every invocation; the compiler cannot safely memoize a reactive scope whose output depends on a value that changes non-deterministically.",
+          "severity": "definite",
+          "blockedOptimization": "Deterministic reactive-scope memoization — the compiler assumes render is a pure function of its inputs; impure calls violate that assumption."
+        },
+        {
+          "rule": "no-nested-components",
+          "filePath": "sample-all.tsx",
+          "line": 41,
+          "message": "Defines an arrow-function component inside another component.",
+          "recommendation": "Move the nested component to module scope.",
+          "bailoutCategory": "nested-component-definition",
+          "compilerReason": "A React component is defined inside another component's render body. Nested component definitions create a new function identity on every render, which defeats memoization. The compiler bails out of optimising the inner component and may also bail out of the outer one.",
+          "severity": "definite",
+          "blockedOptimization": "Inner-component memoization — a new function reference on every render means the compiler's cached output is always stale for the inner component."
+        },
+        {
+          "rule": "no-dom-globals-in-render",
+          "filePath": "sample-all.tsx",
+          "line": 43,
+          "message": "Reads or accesses a browser DOM global during render.",
+          "recommendation": "Move browser global access into useEffect or an event handler.",
+          "bailoutCategory": "side-effect-in-render",
+          "compilerReason": "A DOM or BOM global (e.g. window, document, localStorage) is accessed during render. These globals are environment-specific side effects that the compiler cannot track as reactive values, forcing a bailout.",
+          "severity": "definite",
+          "blockedOptimization": "Server-safe reactive-scope generation — DOM globals are unavailable in server rendering contexts; the compiler bails out to preserve consistent behavior across environments."
+        },
+        {
+          "rule": "no-dom-globals-in-render",
+          "filePath": "sample-all.tsx",
+          "line": 44,
+          "message": "Calls a browser side effect on localStorage during render.",
+          "recommendation": "Move side effects to useEffect or an event handler.",
+          "bailoutCategory": "side-effect-in-render",
+          "compilerReason": "A DOM or BOM global (e.g. window, document, localStorage) is accessed during render. These globals are environment-specific side effects that the compiler cannot track as reactive values, forcing a bailout.",
+          "severity": "definite",
+          "blockedOptimization": "Server-safe reactive-scope generation — DOM globals are unavailable in server rendering contexts; the compiler bails out to preserve consistent behavior across environments."
+        },
+        {
+          "rule": "no-dom-globals-in-render",
+          "filePath": "sample-all.tsx",
+          "line": 45,
+          "message": "Calls a browser side effect on window during render.",
+          "recommendation": "Move side effects to useEffect or an event handler.",
+          "bailoutCategory": "side-effect-in-render",
+          "compilerReason": "A DOM or BOM global (e.g. window, document, localStorage) is accessed during render. These globals are environment-specific side effects that the compiler cannot track as reactive values, forcing a bailout.",
+          "severity": "definite",
+          "blockedOptimization": "Server-safe reactive-scope generation — DOM globals are unavailable in server rendering contexts; the compiler bails out to preserve consistent behavior across environments."
+        },
+        {
+          "rule": "no-dom-globals-in-render",
+          "filePath": "sample-all.tsx",
+          "line": 46,
+          "message": "Calls a browser side effect during render.",
+          "recommendation": "Move side effects to useEffect or an event handler.",
+          "bailoutCategory": "side-effect-in-render",
+          "compilerReason": "A DOM or BOM global (e.g. window, document, localStorage) is accessed during render. These globals are environment-specific side effects that the compiler cannot track as reactive values, forcing a bailout.",
+          "severity": "definite",
+          "blockedOptimization": "Server-safe reactive-scope generation — DOM globals are unavailable in server rendering contexts; the compiler bails out to preserve consistent behavior across environments."
+        }
+      ],
+      "directives": [],
+      "primaryBailoutReason": "A React component is defined inside another component's render body. Nested component definitions create a new function identity on every render, which defeats memoization. The compiler bails out of optimising the inner component and may also bail out of the outer one."
+    }
+  ],
+  "directives": [],
+  "violations": [
+    {
+      "rule": "no-render-mutation",
+      "filePath": "sample-all.tsx",
+      "line": 23,
+      "message": "Mutates a value with '=' directly during render.",
+      "recommendation": "Move the mutation into an event handler or effect.",
+      "bailoutCategory": "mutation-during-render",
+      "compilerReason": "Encountered a mutation of a value that may be shared: mutating a value in a reactive scope invalidates the compiler's ability to create stable memoized outputs.",
+      "severity": "definite",
+      "blockedOptimization": "Reactive-scope creation — the compiler cannot create a stable memoized output if the value is mutated during render."
+    },
+    {
+      "rule": "no-render-mutation",
+      "filePath": "sample-all.tsx",
+      "line": 43,
+      "message": "Mutates a value with '=' directly during render.",
+      "recommendation": "Move the mutation into an event handler or effect.",
+      "bailoutCategory": "mutation-during-render",
+      "compilerReason": "Encountered a mutation of a value that may be shared: mutating a value in a reactive scope invalidates the compiler's ability to create stable memoized outputs.",
+      "severity": "definite",
+      "blockedOptimization": "Reactive-scope creation — the compiler cannot create a stable memoized output if the value is mutated during render."
+    },
+    {
+      "rule": "no-ref-read-in-render",
+      "filePath": "sample-all.tsx",
+      "line": 14,
+      "message": "Reads 'ref.current' during render. Component render must be pure and deterministic.",
+      "recommendation": "Move ref access to an effect (useEffect), an event handler, or use state (useState) instead if you need to trigger a re-render.",
+      "bailoutCategory": "ref-access-in-render",
+      "compilerReason": "Reading ref.current during render: refs are mutable containers whose values are invisible to the compiler's dependency tracking. The compiler cannot include ref values in reactive scopes, so a component that reads refs during render will be bailed out to avoid producing stale memoized output.",
+      "severity": "definite",
+      "blockedOptimization": "Reactive-scope dependency analysis — ref.current is opaque to the compiler's dataflow graph; it cannot reason about when re-memoization is needed."
+    },
+    {
+      "rule": "no-impure-calls",
+      "filePath": "sample-all.tsx",
+      "line": 42,
+      "message": "Calls Math.random() directly during render.",
+      "recommendation": "Move the call into an event handler or an appropriate effect/memoization boundary.",
+      "bailoutCategory": "side-effect-in-render",
+      "compilerReason": "Detected a call to an impure function (e.g. Math.random, Date.now) during render. Impure calls produce different values on every invocation; the compiler cannot safely memoize a reactive scope whose output depends on a value that changes non-deterministically.",
+      "severity": "definite",
+      "blockedOptimization": "Deterministic reactive-scope memoization — the compiler assumes render is a pure function of its inputs; impure calls violate that assumption."
+    },
+    {
+      "rule": "no-impure-calls",
+      "filePath": "sample-all.tsx",
+      "line": 48,
+      "message": "Calls Math.random() directly during render.",
+      "recommendation": "Move the call into an event handler or an appropriate effect/memoization boundary.",
+      "bailoutCategory": "side-effect-in-render",
+      "compilerReason": "Detected a call to an impure function (e.g. Math.random, Date.now) during render. Impure calls produce different values on every invocation; the compiler cannot safely memoize a reactive scope whose output depends on a value that changes non-deterministically.",
+      "severity": "definite",
+      "blockedOptimization": "Deterministic reactive-scope memoization — the compiler assumes render is a pure function of its inputs; impure calls violate that assumption."
+    },
+    {
+      "rule": "no-set-state-in-render",
+      "filePath": "sample-all.tsx",
+      "line": 21,
+      "message": "Calls state updater 'setCount' during render.",
+      "recommendation": "Call state updaters from an event handler or an effect, not during render.",
+      "bailoutCategory": "set-state-in-render",
+      "compilerReason": "setState (or a dispatcher returned by useState) is called unconditionally during the render phase. Calling setState during render creates an infinite re-render loop; the compiler will not attempt to memoize a component that exhibits this pattern.",
+      "severity": "definite",
+      "blockedOptimization": "Full-component memoization — setState in render is an infinite-loop hazard; the compiler refuses to optimise such components."
+    },
+    {
+      "rule": "no-set-state-in-render",
+      "filePath": "sample-all.tsx",
+      "line": 22,
+      "message": "Calls state updater 'dispatch' during render.",
+      "recommendation": "Call state updaters from an event handler or an effect, not during render.",
+      "bailoutCategory": "set-state-in-render",
+      "compilerReason": "setState (or a dispatcher returned by useState) is called unconditionally during the render phase. Calling setState during render creates an infinite re-render loop; the compiler will not attempt to memoize a component that exhibits this pattern.",
+      "severity": "definite",
+      "blockedOptimization": "Full-component memoization — setState in render is an infinite-loop hazard; the compiler refuses to optimise such components."
+    },
+    {
+      "rule": "no-prop-state-mutation",
+      "filePath": "sample-all.tsx",
+      "line": 23,
+      "message": "Mutates a prop or state object during render.",
+      "recommendation": "Create a new shallow copy before changing the object or array.",
+      "bailoutCategory": "mutation-during-render",
+      "compilerReason": "Found a mutation of a prop or state value. Props and state must be treated as immutable during render; the compiler relies on referential stability to determine which reactive scopes can be skipped.",
+      "severity": "definite",
+      "blockedOptimization": "Auto-memoization of props — mutating props breaks the compiler's referential-equality assumption that drives skip decisions."
+    },
+    {
+      "rule": "no-prop-state-mutation",
+      "filePath": "sample-all.tsx",
+      "line": 24,
+      "message": "Mutates a prop or state collection during render.",
+      "recommendation": "Create a new shallow copy before changing the object or array.",
+      "bailoutCategory": "mutation-during-render",
+      "compilerReason": "Found a mutation of a prop or state value. Props and state must be treated as immutable during render; the compiler relies on referential stability to determine which reactive scopes can be skipped.",
+      "severity": "definite",
+      "blockedOptimization": "Auto-memoization of props — mutating props breaks the compiler's referential-equality assumption that drives skip decisions."
+    },
+    {
+      "rule": "no-prop-state-mutation",
+      "filePath": "sample-all.tsx",
+      "line": 25,
+      "message": "Deletes a prop or state property during render.",
+      "recommendation": "Create a new shallow copy and omit the property instead.",
+      "bailoutCategory": "mutation-during-render",
+      "compilerReason": "Found a mutation of a prop or state value. Props and state must be treated as immutable during render; the compiler relies on referential stability to determine which reactive scopes can be skipped.",
+      "severity": "definite",
+      "blockedOptimization": "Auto-memoization of props — mutating props breaks the compiler's referential-equality assumption that drives skip decisions."
+    },
+    {
+      "rule": "no-prop-state-mutation",
+      "filePath": "sample-all.tsx",
+      "line": 32,
+      "message": "Mutates a prop or state collection during render.",
+      "recommendation": "Create a new shallow copy before changing the object or array.",
+      "bailoutCategory": "mutation-during-render",
+      "compilerReason": "Found a mutation of a prop or state value. Props and state must be treated as immutable during render; the compiler relies on referential stability to determine which reactive scopes can be skipped.",
+      "severity": "definite",
+      "blockedOptimization": "Auto-memoization of props — mutating props breaks the compiler's referential-equality assumption that drives skip decisions."
+    },
+    {
+      "rule": "no-nested-components",
+      "filePath": "sample-all.tsx",
+      "line": 27,
+      "message": "Defines component 'NestedChild' inside another component.",
+      "recommendation": "Move the nested component to module scope.",
+      "bailoutCategory": "nested-component-definition",
+      "compilerReason": "A React component is defined inside another component's render body. Nested component definitions create a new function identity on every render, which defeats memoization. The compiler bails out of optimising the inner component and may also bail out of the outer one.",
+      "severity": "definite",
+      "blockedOptimization": "Inner-component memoization — a new function reference on every render means the compiler's cached output is always stale for the inner component."
+    },
+    {
+      "rule": "no-nested-components",
+      "filePath": "sample-all.tsx",
+      "line": 30,
+      "message": "Defines component 'TodoList' inside another component.",
+      "recommendation": "Move the nested component to module scope.",
+      "bailoutCategory": "nested-component-definition",
+      "compilerReason": "A React component is defined inside another component's render body. Nested component definitions create a new function identity on every render, which defeats memoization. The compiler bails out of optimising the inner component and may also bail out of the outer one.",
+      "severity": "definite",
+      "blockedOptimization": "Inner-component memoization — a new function reference on every render means the compiler's cached output is always stale for the inner component."
+    },
+    {
+      "rule": "no-nested-components",
+      "filePath": "sample-all.tsx",
+      "line": 41,
+      "message": "Defines an arrow-function component inside another component.",
+      "recommendation": "Move the nested component to module scope.",
+      "bailoutCategory": "nested-component-definition",
+      "compilerReason": "A React component is defined inside another component's render body. Nested component definitions create a new function identity on every render, which defeats memoization. The compiler bails out of optimising the inner component and may also bail out of the outer one.",
+      "severity": "definite",
+      "blockedOptimization": "Inner-component memoization — a new function reference on every render means the compiler's cached output is always stale for the inner component."
+    },
+    {
+      "rule": "no-dom-globals-in-render",
+      "filePath": "sample-all.tsx",
+      "line": 43,
+      "message": "Reads or accesses a browser DOM global during render.",
+      "recommendation": "Move browser global access into useEffect or an event handler.",
+      "bailoutCategory": "side-effect-in-render",
+      "compilerReason": "A DOM or BOM global (e.g. window, document, localStorage) is accessed during render. These globals are environment-specific side effects that the compiler cannot track as reactive values, forcing a bailout.",
+      "severity": "definite",
+      "blockedOptimization": "Server-safe reactive-scope generation — DOM globals are unavailable in server rendering contexts; the compiler bails out to preserve consistent behavior across environments."
+    },
+    {
+      "rule": "no-dom-globals-in-render",
+      "filePath": "sample-all.tsx",
+      "line": 44,
+      "message": "Calls a browser side effect on localStorage during render.",
+      "recommendation": "Move side effects to useEffect or an event handler.",
+      "bailoutCategory": "side-effect-in-render",
+      "compilerReason": "A DOM or BOM global (e.g. window, document, localStorage) is accessed during render. These globals are environment-specific side effects that the compiler cannot track as reactive values, forcing a bailout.",
+      "severity": "definite",
+      "blockedOptimization": "Server-safe reactive-scope generation — DOM globals are unavailable in server rendering contexts; the compiler bails out to preserve consistent behavior across environments."
+    },
+    {
+      "rule": "no-dom-globals-in-render",
+      "filePath": "sample-all.tsx",
+      "line": 45,
+      "message": "Calls a browser side effect on window during render.",
+      "recommendation": "Move side effects to useEffect or an event handler.",
+      "bailoutCategory": "side-effect-in-render",
+      "compilerReason": "A DOM or BOM global (e.g. window, document, localStorage) is accessed during render. These globals are environment-specific side effects that the compiler cannot track as reactive values, forcing a bailout.",
+      "severity": "definite",
+      "blockedOptimization": "Server-safe reactive-scope generation — DOM globals are unavailable in server rendering contexts; the compiler bails out to preserve consistent behavior across environments."
+    },
+    {
+      "rule": "no-dom-globals-in-render",
+      "filePath": "sample-all.tsx",
+      "line": 46,
+      "message": "Calls a browser side effect during render.",
+      "recommendation": "Move side effects to useEffect or an event handler.",
+      "bailoutCategory": "side-effect-in-render",
+      "compilerReason": "A DOM or BOM global (e.g. window, document, localStorage) is accessed during render. These globals are environment-specific side effects that the compiler cannot track as reactive values, forcing a bailout.",
+      "severity": "definite",
+      "blockedOptimization": "Server-safe reactive-scope generation — DOM globals are unavailable in server rendering contexts; the compiler bails out to preserve consistent behavior across environments."
+    }
+  ],
+  "stats": {
+    "totalComponents": 5,
+    "optimized": 1,
+    "willBailout": 4,
+    "atRisk": 0,
+    "optedOut": 0,
+    "forcedOptIn": 0,
+    "compilerCoveragePercent": 20
+  }
+}

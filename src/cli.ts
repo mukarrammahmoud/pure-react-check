@@ -10,6 +10,21 @@ import { generateSarifReport } from './reporters/sarif.js';
 import { loadConfig } from './config.js';
 import type { Violation } from './rules/types.js';
 
+// Bailout analysis layer
+import {
+  analyseBailouts,
+  saveBaseline,
+  loadBaseline,
+  compareToBaseline,
+} from './bailout/analyser.js';
+import {
+  printBailoutReport,
+  printRegressionReport,
+} from './reporters/bailout-terminal.js';
+import { generateBailoutJsonReport } from './reporters/bailout-json.js';
+
+// ─── Legacy scan CLI ─────────────────────────────────────────────────────────
+
 type OutputFormat = 'terminal' | 'html' | 'json' | 'sarif';
 
 interface CliOptions {
@@ -148,8 +163,8 @@ function printTerminal(
   console.log(
     `Compiler Readiness Score: ${pc.bold(
       score >= 80
-        ? pc.green(`${score.toFixed(1)}% Pure`)
-        : pc.red(`${score.toFixed(1)}% Pure`),
+        ? pc.green(`${score.toFixed(1)}%`)
+        : pc.red(`${score.toFixed(1)}%`),
     )}`,
   );
   console.log(`Scanned Files: ${result.files.length}`);
@@ -157,8 +172,179 @@ function printTerminal(
   console.log(`Total Errors: ${result.errors.length}\n`);
 }
 
+// ─── compiler-report subcommand ───────────────────────────────────────────────
+
+type BailoutFormat = 'terminal' | 'json';
+
+interface CompilerReportOptions {
+  target: string;
+  format: BailoutFormat;
+  explain: boolean;
+  /** CI mode: fail when conditions are not met */
+  ci: boolean;
+  /** CI: max allowed predicted-bailout components (default: no limit) */
+  maxBailouts?: number;
+  /** CI: minimum required readiness percent (default: no limit) */
+  minReadiness?: number;
+  /** CI: fail-on strategy */
+  failOn?: 'any' | 'new';
+  /** Capture a baseline snapshot */
+  baseline: boolean;
+  /** Compare against stored baseline */
+  diff: boolean;
+}
+
+function parseCompilerReportOptions(args: string[]): CompilerReportOptions {
+  let target = './';
+  let format: BailoutFormat = 'terminal';
+  let explain = false;
+  let ci = false;
+  let maxBailouts: number | undefined;
+  let minReadiness: number | undefined;
+  let failOn: 'any' | 'new' | undefined;
+  let baseline = false;
+  let diff = false;
+
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === '--format' || arg.startsWith('--format=')) {
+      const val = arg.includes('=') ? arg.slice(arg.indexOf('=') + 1) : args[++i];
+      if (val === 'json') format = 'json';
+    } else if (arg === '--explain') {
+      explain = true;
+    } else if (arg === '--ci') {
+      ci = true;
+    } else if (arg === '--baseline') {
+      baseline = true;
+    } else if (arg === '--diff') {
+      diff = true;
+    } else if (arg === '--max-bailouts' || arg.startsWith('--max-bailouts=')) {
+      const val = arg.includes('=') ? arg.slice(arg.indexOf('=') + 1) : args[++i];
+      maxBailouts = Number(val);
+    } else if (arg === '--min-readiness' || arg.startsWith('--min-readiness=')) {
+      const val = arg.includes('=') ? arg.slice(arg.indexOf('=') + 1) : args[++i];
+      minReadiness = Number(val);
+    } else if (arg === '--fail-on' || arg.startsWith('--fail-on=')) {
+      const val = arg.includes('=') ? arg.slice(arg.indexOf('=') + 1) : args[++i];
+      if (val === 'any' || val === 'new') failOn = val;
+    } else if (!arg.startsWith('--')) {
+      target = arg;
+    }
+  }
+  return { target, format, explain, ci, maxBailouts, minReadiness, failOn, baseline, diff };
+}
+
+async function runCompilerReportCli(args: string[]): Promise<number> {
+  const opts = parseCompilerReportOptions(args);
+
+  console.log(pc.dim(`\nAnalysing ${pc.white(opts.target)} …\n`));
+
+  const report = await analyseBailouts({ target: opts.target });
+
+  // ── Baseline capture ───────────────────────────────────────────────────────
+  if (opts.baseline) {
+    const baselinePath = saveBaseline(report);
+    console.log(`${pc.green('✓')} Baseline captured → ${pc.cyan(baselinePath)}`);
+    console.log(pc.dim('Run with --diff to compare future scans against this baseline.\n'));
+    // Still print normal report after saving
+  }
+
+  // ── Diff against baseline ──────────────────────────────────────────────────
+  if (opts.diff) {
+    const storedBaseline = loadBaseline();
+    if (!storedBaseline) {
+      console.error(
+        pc.red('No baseline found. Run with --baseline first to capture one.'),
+      );
+      return 1;
+    }
+    const diff = compareToBaseline(report, storedBaseline);
+
+    if (opts.format === 'json') {
+      const reportPath = generateBailoutJsonReport(report);
+      console.log(`Report written to ${pc.green(reportPath)}`);
+    } else {
+      printBailoutReport(report, { explain: opts.explain });
+      printRegressionReport(diff);
+    }
+
+    // In CI mode, fail on regressions
+    if (opts.ci && diff.hasRegressions) {
+      console.error(pc.red(`\n✗ CI failed: ${diff.regressions.length} regression(s) detected.\n`));
+      return 1;
+    }
+    if (opts.ci && opts.failOn === 'new') {
+      const newBailouts = diff.newComponents.filter((c) => c.status === 'predicted-bailout');
+      if (newBailouts.length > 0) {
+        console.error(
+          pc.red(`\n✗ CI failed: ${newBailouts.length} new predicted-bailout component(s).\n`),
+        );
+        return 1;
+      }
+    }
+    return diff.hasRegressions ? 1 : 0;
+  }
+
+  // ── Normal report output ───────────────────────────────────────────────────
+  if (opts.format === 'json') {
+    const reportPath = generateBailoutJsonReport(report);
+    console.log(`Report written to ${pc.green(reportPath)}`);
+  } else {
+    printBailoutReport(report, { explain: opts.explain });
+  }
+
+  // ── CI enforcement ─────────────────────────────────────────────────────────
+  if (opts.ci) {
+    let ciFailed = false;
+    const { stats } = report;
+
+    if (opts.maxBailouts !== undefined && stats.predictedBailoutComponents > opts.maxBailouts) {
+      console.error(
+        pc.red(
+          `✗ CI failed: ${stats.predictedBailoutComponents} predicted-bailout component(s) ` +
+          `exceeds max-bailouts limit of ${opts.maxBailouts}.`,
+        ),
+      );
+      ciFailed = true;
+    }
+
+    if (opts.minReadiness !== undefined && stats.compilerReadinessPercent < opts.minReadiness) {
+      console.error(
+        pc.red(
+          `✗ CI failed: readiness ${stats.compilerReadinessPercent.toFixed(1)}% ` +
+          `is below min-readiness of ${opts.minReadiness}%.`,
+        ),
+      );
+      ciFailed = true;
+    }
+
+    if (opts.failOn === 'any' && stats.predictedBailoutComponents > 0) {
+      console.error(
+        pc.red(`✗ CI failed: ${stats.predictedBailoutComponents} predicted-bailout component(s) detected.`),
+      );
+      ciFailed = true;
+    }
+
+    if (!ciFailed) {
+      console.log(pc.green('✓ CI readiness check passed.\n'));
+    }
+
+    return ciFailed ? 1 : 0;
+  }
+
+  // Default exit: 1 if any predicted bailouts
+  return report.stats.predictedBailoutComponents > 0 ? 1 : 0;
+}
+
+// ─── Main CLI entry ───────────────────────────────────────────────────────────
+
 export async function runCli(args: string[] = process.argv.slice(2)): Promise<number> {
-  // Load config file first, then overlay CLI flags
+  // Dispatch subcommands first
+  if (args[0] === 'compiler-report') {
+    return runCompilerReportCli(args.slice(1));
+  }
+
+  // Legacy scanner mode (unchanged)
   const fileConfig = loadConfig();
 
   let options: CliOptions;

@@ -19,7 +19,6 @@ function getFunctionName(path: NodePath<t.Function>): string | null {
   return null;
 }
 
-
 export function isReactComponent(funcPath: NodePath<t.Function>): boolean {
   const name = getFunctionName(funcPath);
   if (name && /^[A-Z]/.test(name)) return true;
@@ -63,6 +62,16 @@ const DEFERRED_HOOKS = new Set([
   'useCallback',
 ]);
 
+/**
+ * Determines whether an AST node is executed synchronously during the render phase
+ * of a React component or hook.
+ *
+ * Rules:
+ *  1. Inside JSX event attributes (e.g. onClick={() => ...}) -> FALSE
+ *  2. Inside deferred hook callbacks (useEffect, useCallback, etc.) -> FALSE
+ *  3. Inside nested helper / callback functions (not a component or hook) -> FALSE
+ *  4. Directly in the body of a React component or hook -> TRUE
+ */
 export function isRenderPhase(path: NodePath<t.Node>): boolean {
   let current: NodePath<t.Node> | null = path.parentPath;
 
@@ -87,15 +96,10 @@ export function isRenderPhase(path: NodePath<t.Node>): boolean {
     }
 
     if (current.isFunction()) {
-      const funcName = getFunctionName(current);
-
-      if (funcName && /^(handle|on)[A-Z]/.test(funcName)) {
-        return false;
-      }
-
-      if (isReactComponentOrHook(current)) {
-        return true;
-      }
+      // The first (innermost) function node we encounter determines execution scope:
+      // If it's a React Component or Hook, path is directly in its render body.
+      // If it's any other nested function (callback, helper, event handler), it's deferred!
+      return isReactComponentOrHook(current);
     }
 
     current = current.parentPath;
@@ -155,7 +159,3 @@ export function isLazyRefInit(path: NodePath<t.Node>): boolean {
 
   return testChecksRef && consequentAssignsRef;
 }
-
-
-
-
