@@ -1,36 +1,74 @@
 /**
- * pure-react-check Programmatic API
+ * pure-react-check — Programmatic Node.js API (v1.2.0)
  *
- * Use this when you want to call the scanner from Node.js code
- * instead of the CLI.
- *
- * @example
- * import { scan, getScore } from 'pure-react-check/api';
- *
- * const result = await scan('./src');
- * const score  = getScore(result);
- * console.log(`Score: ${score.toFixed(1)}%`);
+ * Public surface area for integration with build tools, CI/CD scripts,
+ * custom reporting pipelines, and compiler compatibility suites.
  */
 
-export { scanDirectory as scan } from './scanner.js';
-export type { ScanResult, ScanError } from './scanner.js';
-export type { Violation, AnalysisRule, RuleContext } from './rules/types.js';
-export { allRules } from './rules/index.js';
-export { loadConfig } from './config.js';
-export type { PureReactCheckConfig } from './config.js';
-export { generateHtmlReport } from './reporters/html.js';
-export { generateJsonReport } from './reporters/json.js';
-export { generateSarifReport } from './reporters/sarif.js';
-export type { JsonReport } from './reporters/json.js';
+// ── Bailout Engine ──
+export {
+  analyseBailouts,
+  saveBaseline,
+  loadBaseline,
+  compareToBaseline,
+} from './bailout/analyser.js';
 
-/**
- * Computes the Compiler Readiness Score from a ScanResult.
- *
- * Score = ((scanned files − files with violations) / scanned files) × 100
- * Returns 100 when no files were scanned.
- */
-export function getScore(result: import('./scanner.js').ScanResult): number {
-  const { files, violations } = result;
-  const filesWithViolations = new Set(violations.map((v) => v.filePath)).size;
-  return files.length === 0 ? 100 : ((files.length - filesWithViolations) / files.length) * 100;
-}
+export type { BailoutAnalysisOptions } from './bailout/analyser.js';
+
+export {
+  printBailoutReport,
+} from './reporters/bailout-terminal.js';
+
+export {
+  generateBailoutJsonReport,
+} from './reporters/bailout-json.js';
+
+export {
+  RULE_TO_BAILOUT_MAP,
+  getBailoutMapping,
+} from './bailout/rule-map.js';
+
+export type { BailoutMapping } from './bailout/rule-map.js';
+
+export type {
+  BailoutCategory,
+  RuleImpact,
+  BailoutLikelihood,
+  DetectionConfidence,
+  CompilerPrediction,
+  AnnotatedViolation,
+  CompilerDirective,
+  ComponentStatus,
+  ComponentKind,
+  ComponentBailoutSummary,
+  ReadinessStats,
+  BailoutBaseline,
+  RegressionReport,
+  BailoutReport,
+} from './bailout/types.js';
+
+export { SCHEMA_VERSION, SCORE_VERSION } from './bailout/types.js';
+
+// ── Compiler Compatibility Layer ──
+export {
+  runCompilerCompatibility,
+  createCompilerAdapter,
+  ReferenceCompilerAdapter,
+  ReactCompilerAdapter,
+  comparePredictionAndObservation,
+} from './compiler/index.js';
+
+export type {
+  CompilerAdapter,
+  CompilerOutcome,
+  CompilerDiagnostic,
+  CompilerObservation,
+  CompatibilityClassification,
+  MismatchKind,
+  CompatibilityResult,
+  RuleMatrixEntry,
+  RuleReliability,
+  CompatibilityReport,
+  ObservationSource,
+  FixtureRunnerOptions,
+} from './compiler/index.js';

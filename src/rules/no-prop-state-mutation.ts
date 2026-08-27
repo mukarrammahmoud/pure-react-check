@@ -4,6 +4,7 @@ import type { NodePath } from "@babel/traverse" with {
 import type * as t from "@babel/types" with { "resolution-mode": "import" };
 import type { AnalysisRule } from "./types.js";
 import { getRenderComponent } from "./utils.js";
+import { buildScopeAliasMap, resolveAliasSource } from "./dataflow.js";
 
 const mutatingMethods = new Set([
   "push",
@@ -15,26 +16,41 @@ const mutatingMethods = new Set([
   "unshift",
 ]);
 
-function hasPropsOrStateRoot(expression: t.Node): boolean {
+function hasPropsOrStateRoot(expression: t.Node, compPath: NodePath<t.Function> | null): boolean {
   let current: t.Node = expression;
   while (
     current.type === "MemberExpression" ||
     current.type === "OptionalMemberExpression"
   )
     current = current.object;
-  return (
-    current.type === "Identifier" && /^(props|state|items)$/.test(current.name)
-  );
+
+  if (current.type !== "Identifier") return false;
+
+  if (/^(props|state|items)$/.test(current.name)) {
+    return true;
+  }
+
+  // Use Dataflow Alias Map to check indirect aliases (e.g. const obj = props.user)
+  if (compPath) {
+    const aliasMap = buildScopeAliasMap(compPath);
+    const aliasSource = resolveAliasSource(current.name, aliasMap);
+    if (aliasSource && (aliasSource.kind === 'prop' || aliasSource.kind === 'state' || /^(props|state|items)$/.test(aliasSource.sourceName))) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 export const noPropStateMutationRule: AnalysisRule = {
   name: "no-prop-state-mutation",
   visitors: (context) => ({
     AssignmentExpression(path: NodePath<t.AssignmentExpression>) {
+      const compPath = getRenderComponent(path);
       if (
-        !getRenderComponent(path) ||
+        !compPath ||
         path.node.left.type !== "MemberExpression" ||
-        !hasPropsOrStateRoot(path.node.left)
+        !hasPropsOrStateRoot(path.node.left, compPath)
       )
         return;
       context.report(path, {
@@ -46,12 +62,13 @@ export const noPropStateMutationRule: AnalysisRule = {
     },
     CallExpression(path: NodePath<t.CallExpression>) {
       const callee = path.node.callee;
+      const compPath = getRenderComponent(path);
       if (
-        !getRenderComponent(path) ||
+        !compPath ||
         callee.type !== "MemberExpression" ||
         callee.property.type !== "Identifier" ||
         !mutatingMethods.has(callee.property.name) ||
-        !hasPropsOrStateRoot(callee.object)
+        !hasPropsOrStateRoot(callee.object, compPath)
       )
         return;
       context.report(path, {
@@ -63,11 +80,12 @@ export const noPropStateMutationRule: AnalysisRule = {
     },
     UnaryExpression(path: NodePath<t.UnaryExpression>) {
       const argument = path.node.argument;
+      const compPath = getRenderComponent(path);
       if (
         path.node.operator !== "delete" ||
-        !getRenderComponent(path) ||
+        !compPath ||
         argument.type !== "MemberExpression" ||
-        !hasPropsOrStateRoot(argument)
+        !hasPropsOrStateRoot(argument, compPath)
       )
         return;
       context.report(path, {

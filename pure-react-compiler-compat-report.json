@@ -1,0 +1,1091 @@
+{
+  "schemaVersion": 1,
+  "toolVersion": "1.2.0",
+  "compilerVersion": "19.0.0-reference",
+  "adapterName": "Reference Compiler Model",
+  "timestamp": "2026-08-27T20:24:59.198Z",
+  "summary": {
+    "totalFixtures": 46,
+    "agreement": 41,
+    "mismatch": 5,
+    "unknown": 0,
+    "agreementPercent": 89.13043478260869
+  },
+  "ruleMatrix": {
+    "no-async-component": {
+      "total": 1,
+      "agreement": 1,
+      "mismatch": 0,
+      "unknown": 0,
+      "status": "MATCH"
+    },
+    "no-impure-calls": {
+      "total": 1,
+      "agreement": 1,
+      "mismatch": 0,
+      "unknown": 0,
+      "status": "MATCH"
+    },
+    "no-nested-components": {
+      "total": 4,
+      "agreement": 2,
+      "mismatch": 2,
+      "unknown": 0,
+      "status": "REVIEW"
+    },
+    "no-unstable-default-props": {
+      "total": 1,
+      "agreement": 0,
+      "mismatch": 1,
+      "unknown": 0,
+      "status": "REVIEW"
+    },
+    "no-violation-detected": {
+      "total": 21,
+      "agreement": 19,
+      "mismatch": 2,
+      "unknown": 0,
+      "status": "REVIEW"
+    },
+    "no-dom-globals-in-render": {
+      "total": 2,
+      "agreement": 2,
+      "mismatch": 0,
+      "unknown": 0,
+      "status": "MATCH"
+    },
+    "no-timer-in-render": {
+      "total": 1,
+      "agreement": 1,
+      "mismatch": 0,
+      "unknown": 0,
+      "status": "MATCH"
+    },
+    "no-render-mutation": {
+      "total": 5,
+      "agreement": 5,
+      "mismatch": 0,
+      "unknown": 0,
+      "status": "MATCH"
+    },
+    "no-ref-read-in-render": {
+      "total": 3,
+      "agreement": 3,
+      "mismatch": 0,
+      "unknown": 0,
+      "status": "MATCH"
+    },
+    "no-conditional-hooks": {
+      "total": 1,
+      "agreement": 1,
+      "mismatch": 0,
+      "unknown": 0,
+      "status": "MATCH"
+    },
+    "no-set-state-in-render": {
+      "total": 4,
+      "agreement": 4,
+      "mismatch": 0,
+      "unknown": 0,
+      "status": "MATCH"
+    },
+    "no-ref-as-dependency": {
+      "total": 1,
+      "agreement": 1,
+      "mismatch": 0,
+      "unknown": 0,
+      "status": "MATCH"
+    },
+    "no-prop-state-mutation": {
+      "total": 1,
+      "agreement": 1,
+      "mismatch": 0,
+      "unknown": 0,
+      "status": "MATCH"
+    }
+  },
+  "results": [
+    {
+      "fixture": "components/async-component.tsx",
+      "componentName": "AsyncClientComp",
+      "rule": "no-async-component",
+      "prediction": {
+        "outcome": "bailout",
+        "likelihood": "definite",
+        "reason": "The component function is declared async. The compiler only processes synchronous components. An async component returns a Promise instead of a React element, which the compiler cannot model."
+      },
+      "compilerObservation": {
+        "componentName": "AsyncClientComp",
+        "outcome": "bailed-out",
+        "reason": "Async component functions are not supported by the compiler.",
+        "compilerVersion": "19.0.0-reference"
+      },
+      "result": "agreement",
+      "notes": [
+        "Both static analyzer and React Compiler agree component bails out."
+      ]
+    },
+    {
+      "fixture": "components/impure-call.tsx",
+      "componentName": "ImpureCallInRenderComp",
+      "rule": "no-impure-calls",
+      "prediction": {
+        "outcome": "bailout",
+        "likelihood": "definite",
+        "reason": "An impure function (e.g. Math.random, Date.now) is called during render. Render must be deterministic. Impure calls produce a different value on every call, so the compiler cannot safely cache a render whose output depends on their return value."
+      },
+      "compilerObservation": {
+        "componentName": "ImpureCallInRenderComp",
+        "outcome": "bailed-out",
+        "reason": "Impure call 'Math.random' during render.",
+        "compilerVersion": "19.0.0-reference"
+      },
+      "result": "agreement",
+      "notes": [
+        "Both static analyzer and React Compiler agree component bails out."
+      ]
+    },
+    {
+      "fixture": "components/nested-component.tsx",
+      "componentName": "OuterComp",
+      "rule": "no-nested-components",
+      "prediction": {
+        "outcome": "bailout",
+        "likelihood": "definite",
+        "reason": "A React component or hook is defined inside another component's render body. This creates a new function reference on every render, which prevents the inner component from ever receiving stable props and defeats any memoization applied to it."
+      },
+      "compilerObservation": {
+        "componentName": "OuterComp",
+        "outcome": "bailed-out",
+        "reason": "Nested component definition 'InnerChildComp' in render body.",
+        "compilerVersion": "19.0.0-reference"
+      },
+      "result": "agreement",
+      "notes": [
+        "Both static analyzer and React Compiler agree component bails out."
+      ]
+    },
+    {
+      "fixture": "components/nested-component.tsx",
+      "componentName": "InnerChildComp",
+      "rule": "no-nested-components",
+      "prediction": {
+        "outcome": "bailout",
+        "likelihood": "definite",
+        "reason": "A React component or hook is defined inside another component's render body. This creates a new function reference on every render, which prevents the inner component from ever receiving stable props and defeats any memoization applied to it."
+      },
+      "compilerObservation": {
+        "componentName": "InnerChildComp",
+        "outcome": "optimized",
+        "reason": "Successfully compiled and reactive scopes auto-memoized.",
+        "compilerVersion": "19.0.0-reference"
+      },
+      "result": "mismatch",
+      "notes": [
+        "⚠ FALSE POSITIVE: Static analyzer predicted BAILOUT, but compiler OPTIMIZED.",
+        "Static reason: A React component or hook is defined inside another component's render body. This creates a new function reference on every render, which prevents the inner component from ever receiving stable props and defeats any memoization applied to it."
+      ]
+    },
+    {
+      "fixture": "components/unstable-default-props.tsx",
+      "componentName": "UnstableDefaultPropsComp",
+      "rule": "no-unstable-default-props",
+      "prediction": {
+        "outcome": "bailout",
+        "likelihood": "likely",
+        "reason": "An object or array literal is used as a prop default value inside the function signature. Each render creates a new reference for that default value, making prop-equality comparisons always fail and causing unnecessary downstream re-renders."
+      },
+      "compilerObservation": {
+        "componentName": "UnstableDefaultPropsComp",
+        "outcome": "optimized",
+        "reason": "Successfully compiled and reactive scopes auto-memoized.",
+        "compilerVersion": "19.0.0-reference"
+      },
+      "result": "mismatch",
+      "notes": [
+        "⚠ FALSE POSITIVE: Static analyzer predicted BAILOUT, but compiler OPTIMIZED.",
+        "Static reason: An object or array literal is used as a prop default value inside the function signature. Each render creates a new reference for that default value, making prop-equality comparisons always fail and causing unnecessary downstream re-renders."
+      ]
+    },
+    {
+      "fixture": "components/unstable-jsx-key.tsx",
+      "componentName": "UnstableJsxKeyComp",
+      "prediction": {
+        "outcome": "ready",
+        "likelihood": "possible"
+      },
+      "compilerObservation": {
+        "componentName": "UnstableJsxKeyComp",
+        "outcome": "optimized",
+        "reason": "Successfully compiled and reactive scopes auto-memoized.",
+        "compilerVersion": "19.0.0-reference"
+      },
+      "result": "agreement",
+      "notes": [
+        "Both static analyzer and React Compiler agree component is optimized."
+      ]
+    },
+    {
+      "fixture": "directives/function-directives.tsx",
+      "componentName": "OptedOut",
+      "prediction": {
+        "outcome": "opted-out",
+        "likelihood": "possible"
+      },
+      "compilerObservation": {
+        "componentName": "OptedOut",
+        "outcome": "skipped",
+        "reason": "Skipped due to \"use no memo\" directive.",
+        "compilerVersion": "19.0.0-reference"
+      },
+      "result": "agreement",
+      "notes": [
+        "Both static analyzer and React Compiler respect directive opt-out."
+      ]
+    },
+    {
+      "fixture": "directives/function-directives.tsx",
+      "componentName": "StillReady",
+      "prediction": {
+        "outcome": "ready",
+        "likelihood": "possible"
+      },
+      "compilerObservation": {
+        "componentName": "StillReady",
+        "outcome": "skipped",
+        "reason": "Skipped due to \"use no memo\" directive.",
+        "compilerVersion": "19.0.0-reference"
+      },
+      "result": "mismatch",
+      "notes": [
+        "Mismatch between prediction (ready) and compiler observation (skipped)."
+      ]
+    },
+    {
+      "fixture": "directives/function-directives.tsx",
+      "componentName": "ForcedIn",
+      "prediction": {
+        "outcome": "forced-opt-in",
+        "likelihood": "possible"
+      },
+      "compilerObservation": {
+        "componentName": "ForcedIn",
+        "outcome": "skipped",
+        "reason": "Skipped due to \"use no memo\" directive.",
+        "compilerVersion": "19.0.0-reference"
+      },
+      "result": "mismatch",
+      "notes": [
+        "Mismatch between prediction (forced-opt-in) and compiler observation (skipped)."
+      ]
+    },
+    {
+      "fixture": "directives/module-opt-out.tsx",
+      "componentName": "CompA",
+      "prediction": {
+        "outcome": "opted-out",
+        "likelihood": "possible"
+      },
+      "compilerObservation": {
+        "componentName": "CompA",
+        "outcome": "skipped",
+        "reason": "Skipped due to \"use no memo\" directive.",
+        "compilerVersion": "19.0.0-reference"
+      },
+      "result": "agreement",
+      "notes": [
+        "Both static analyzer and React Compiler respect directive opt-out."
+      ]
+    },
+    {
+      "fixture": "directives/module-opt-out.tsx",
+      "componentName": "CompB",
+      "prediction": {
+        "outcome": "opted-out",
+        "likelihood": "possible"
+      },
+      "compilerObservation": {
+        "componentName": "CompB",
+        "outcome": "skipped",
+        "reason": "Skipped due to \"use no memo\" directive.",
+        "compilerVersion": "19.0.0-reference"
+      },
+      "result": "agreement",
+      "notes": [
+        "Both static analyzer and React Compiler respect directive opt-out."
+      ]
+    },
+    {
+      "fixture": "directives/use-memo.tsx",
+      "componentName": "ForcedOptInComp",
+      "prediction": {
+        "outcome": "forced-opt-in",
+        "likelihood": "possible"
+      },
+      "compilerObservation": {
+        "componentName": "ForcedOptInComp",
+        "outcome": "optimized",
+        "reason": "Successfully compiled and reactive scopes auto-memoized.",
+        "compilerVersion": "19.0.0-reference"
+      },
+      "result": "agreement",
+      "notes": [
+        "Forced opt-in component observed as 'optimized'."
+      ]
+    },
+    {
+      "fixture": "directives/use-no-memo.tsx",
+      "componentName": "OptedOutModuleComp",
+      "prediction": {
+        "outcome": "opted-out",
+        "likelihood": "possible"
+      },
+      "compilerObservation": {
+        "componentName": "OptedOutModuleComp",
+        "outcome": "skipped",
+        "reason": "Skipped due to \"use no memo\" directive.",
+        "compilerVersion": "19.0.0-reference"
+      },
+      "result": "agreement",
+      "notes": [
+        "Both static analyzer and React Compiler respect directive opt-out."
+      ]
+    },
+    {
+      "fixture": "dom-global/dom-in-render.tsx",
+      "componentName": "DomGlobalInRenderComp",
+      "rule": "no-dom-globals-in-render",
+      "prediction": {
+        "outcome": "bailout",
+        "likelihood": "definite",
+        "reason": "A browser global (window, document, localStorage, etc.) is accessed during render. Browser globals are not part of React's reactive model and are unavailable in server-rendering environments. The compiler cannot track them as reactive inputs or outputs."
+      },
+      "compilerObservation": {
+        "componentName": "DomGlobalInRenderComp",
+        "outcome": "bailed-out",
+        "reason": "Access to browser DOM global 'window' during render.",
+        "compilerVersion": "19.0.0-reference"
+      },
+      "result": "agreement",
+      "notes": [
+        "Both static analyzer and React Compiler agree component bails out."
+      ]
+    },
+    {
+      "fixture": "dom-global/input.tsx",
+      "componentName": "AccessesDomInRender",
+      "rule": "no-dom-globals-in-render",
+      "prediction": {
+        "outcome": "bailout",
+        "likelihood": "definite",
+        "reason": "A browser global (window, document, localStorage, etc.) is accessed during render. Browser globals are not part of React's reactive model and are unavailable in server-rendering environments. The compiler cannot track them as reactive inputs or outputs."
+      },
+      "compilerObservation": {
+        "componentName": "AccessesDomInRender",
+        "outcome": "bailed-out",
+        "reason": "Access to browser DOM global 'document' during render.",
+        "compilerVersion": "19.0.0-reference"
+      },
+      "result": "agreement",
+      "notes": [
+        "Both static analyzer and React Compiler agree component bails out."
+      ]
+    },
+    {
+      "fixture": "dom-global/timer-in-render.tsx",
+      "componentName": "TimerInRenderComp",
+      "rule": "no-timer-in-render",
+      "prediction": {
+        "outcome": "bailout",
+        "likelihood": "definite",
+        "reason": "setTimeout or setInterval is called during the render phase. Timer registration is a side effect. Calling it in render means a new timer is registered on every render — a correctness bug that the compiler cannot resolve through memoization."
+      },
+      "compilerObservation": {
+        "componentName": "TimerInRenderComp",
+        "outcome": "bailed-out",
+        "reason": "Unconditional state update 'setTimeout' called during render.",
+        "compilerVersion": "19.0.0-reference"
+      },
+      "result": "agreement",
+      "notes": [
+        "Both static analyzer and React Compiler agree component bails out."
+      ]
+    },
+    {
+      "fixture": "false-negatives/helper-fn-mutation.tsx",
+      "componentName": "HelperFnMutationComp",
+      "prediction": {
+        "outcome": "ready",
+        "likelihood": "possible"
+      },
+      "compilerObservation": {
+        "componentName": "HelperFnMutationComp",
+        "outcome": "optimized",
+        "reason": "Successfully compiled and reactive scopes auto-memoized.",
+        "compilerVersion": "19.0.0-reference"
+      },
+      "result": "agreement",
+      "notes": [
+        "Both static analyzer and React Compiler agree component is optimized."
+      ]
+    },
+    {
+      "fixture": "false-negatives/indirect-alias-mutation.tsx",
+      "componentName": "IndirectAliasMutationComp",
+      "rule": "no-render-mutation",
+      "prediction": {
+        "outcome": "bailout",
+        "likelihood": "definite",
+        "reason": "A value is mutated inside the render body. React requires render to be a pure function: calling it twice with the same inputs must produce the same output. Mutations break this guarantee and prevent the compiler from safely skipping re-renders."
+      },
+      "compilerObservation": {
+        "componentName": "IndirectAliasMutationComp",
+        "outcome": "bailed-out",
+        "reason": "Render-phase mutation of property/object.",
+        "compilerVersion": "19.0.0-reference"
+      },
+      "result": "agreement",
+      "notes": [
+        "Both static analyzer and React Compiler agree component bails out."
+      ]
+    },
+    {
+      "fixture": "false-positives/animation-in-effect.tsx",
+      "componentName": "AnimationInEffectComp",
+      "prediction": {
+        "outcome": "ready",
+        "likelihood": "possible"
+      },
+      "compilerObservation": {
+        "componentName": "AnimationInEffectComp",
+        "outcome": "optimized",
+        "reason": "Successfully compiled and reactive scopes auto-memoized.",
+        "compilerVersion": "19.0.0-reference"
+      },
+      "result": "agreement",
+      "notes": [
+        "Both static analyzer and React Compiler agree component is optimized."
+      ]
+    },
+    {
+      "fixture": "false-positives/dom-in-effect.tsx",
+      "componentName": "DomInEffectComp",
+      "prediction": {
+        "outcome": "ready",
+        "likelihood": "possible"
+      },
+      "compilerObservation": {
+        "componentName": "DomInEffectComp",
+        "outcome": "optimized",
+        "reason": "Successfully compiled and reactive scopes auto-memoized.",
+        "compilerVersion": "19.0.0-reference"
+      },
+      "result": "agreement",
+      "notes": [
+        "Both static analyzer and React Compiler agree component is optimized."
+      ]
+    },
+    {
+      "fixture": "false-positives/lazy-ref-init.tsx",
+      "componentName": "LazyRefInitComp",
+      "rule": "no-ref-read-in-render",
+      "prediction": {
+        "outcome": "bailout",
+        "likelihood": "definite",
+        "reason": "A value is mutated after being used in a JSX expression. The compiler attempts to hoist JSX into stable cached outputs, but a post-capture mutation means the cached output may be stale by the end of the render."
+      },
+      "compilerObservation": {
+        "componentName": "LazyRefInitComp",
+        "outcome": "bailed-out",
+        "reason": "Read of ref.current during render.",
+        "compilerVersion": "19.0.0-reference"
+      },
+      "result": "agreement",
+      "notes": [
+        "Both static analyzer and React Compiler agree component bails out."
+      ]
+    },
+    {
+      "fixture": "false-positives/ref-in-effect.tsx",
+      "componentName": "RefInEffectComp",
+      "prediction": {
+        "outcome": "ready",
+        "likelihood": "possible"
+      },
+      "compilerObservation": {
+        "componentName": "RefInEffectComp",
+        "outcome": "optimized",
+        "reason": "Successfully compiled and reactive scopes auto-memoized.",
+        "compilerVersion": "19.0.0-reference"
+      },
+      "result": "agreement",
+      "notes": [
+        "Both static analyzer and React Compiler agree component is optimized."
+      ]
+    },
+    {
+      "fixture": "false-positives/ref-in-handler.tsx",
+      "componentName": "RefInHandlerComp",
+      "prediction": {
+        "outcome": "ready",
+        "likelihood": "possible"
+      },
+      "compilerObservation": {
+        "componentName": "RefInHandlerComp",
+        "outcome": "optimized",
+        "reason": "Successfully compiled and reactive scopes auto-memoized.",
+        "compilerVersion": "19.0.0-reference"
+      },
+      "result": "agreement",
+      "notes": [
+        "Both static analyzer and React Compiler agree component is optimized."
+      ]
+    },
+    {
+      "fixture": "false-positives/ref-patterns.tsx",
+      "componentName": "LazyRefInit",
+      "prediction": {
+        "outcome": "ready",
+        "likelihood": "possible"
+      },
+      "compilerObservation": {
+        "componentName": "LazyRefInit",
+        "outcome": "optimized",
+        "reason": "Successfully compiled and reactive scopes auto-memoized.",
+        "compilerVersion": "19.0.0-reference"
+      },
+      "result": "agreement",
+      "notes": [
+        "Both static analyzer and React Compiler agree component is optimized."
+      ]
+    },
+    {
+      "fixture": "false-positives/ref-patterns.tsx",
+      "componentName": "RefInEffect",
+      "prediction": {
+        "outcome": "ready",
+        "likelihood": "possible"
+      },
+      "compilerObservation": {
+        "componentName": "RefInEffect",
+        "outcome": "optimized",
+        "reason": "Successfully compiled and reactive scopes auto-memoized.",
+        "compilerVersion": "19.0.0-reference"
+      },
+      "result": "agreement",
+      "notes": [
+        "Both static analyzer and React Compiler agree component is optimized."
+      ]
+    },
+    {
+      "fixture": "false-positives/ref-patterns.tsx",
+      "componentName": "RefInHandler",
+      "prediction": {
+        "outcome": "ready",
+        "likelihood": "possible"
+      },
+      "compilerObservation": {
+        "componentName": "RefInHandler",
+        "outcome": "optimized",
+        "reason": "Successfully compiled and reactive scopes auto-memoized.",
+        "compilerVersion": "19.0.0-reference"
+      },
+      "result": "agreement",
+      "notes": [
+        "Both static analyzer and React Compiler agree component is optimized."
+      ]
+    },
+    {
+      "fixture": "false-positives/safe-state-update.tsx",
+      "componentName": "SafeStateUpdateComp",
+      "prediction": {
+        "outcome": "ready",
+        "likelihood": "possible"
+      },
+      "compilerObservation": {
+        "componentName": "SafeStateUpdateComp",
+        "outcome": "optimized",
+        "reason": "Successfully compiled and reactive scopes auto-memoized.",
+        "compilerVersion": "19.0.0-reference"
+      },
+      "result": "agreement",
+      "notes": [
+        "Both static analyzer and React Compiler agree component is optimized."
+      ]
+    },
+    {
+      "fixture": "hooks/conditional-hook.tsx",
+      "componentName": "ConditionalHookComp",
+      "rule": "no-conditional-hooks",
+      "prediction": {
+        "outcome": "bailout",
+        "likelihood": "definite",
+        "reason": "A hook is called inside a conditional branch or loop, violating the Rules of Hooks. The compiler requires a stable, unconditional hook-call order to build its reactive scope graph. Conditional hooks make this order unpredictable."
+      },
+      "compilerObservation": {
+        "componentName": "ConditionalHookComp",
+        "outcome": "bailed-out",
+        "reason": "Conditional call of hook 'useState'.",
+        "compilerVersion": "19.0.0-reference"
+      },
+      "result": "agreement",
+      "notes": [
+        "Both static analyzer and React Compiler agree component bails out."
+      ]
+    },
+    {
+      "fixture": "hooks/custom-hook-broken.tsx",
+      "componentName": "useBrokenCustomHook",
+      "rule": "no-set-state-in-render",
+      "prediction": {
+        "outcome": "bailout",
+        "likelihood": "definite",
+        "reason": "A state updater (setState or useReducer dispatch) is called unconditionally during the render phase. This creates an infinite re-render loop. The compiler cannot and will not attempt to memoize a component with this pattern."
+      },
+      "compilerObservation": {
+        "componentName": "useBrokenCustomHook",
+        "outcome": "bailed-out",
+        "reason": "Unconditional state update 'setVal' called during render.",
+        "compilerVersion": "19.0.0-reference"
+      },
+      "result": "agreement",
+      "notes": [
+        "Both static analyzer and React Compiler agree component bails out."
+      ]
+    },
+    {
+      "fixture": "hooks/custom-hook-clean.tsx",
+      "componentName": "useCleanCustomHook",
+      "prediction": {
+        "outcome": "ready",
+        "likelihood": "possible"
+      },
+      "compilerObservation": {
+        "componentName": "useCleanCustomHook",
+        "outcome": "optimized",
+        "reason": "Successfully compiled and reactive scopes auto-memoized.",
+        "compilerVersion": "19.0.0-reference"
+      },
+      "result": "agreement",
+      "notes": [
+        "Both static analyzer and React Compiler agree component is optimized."
+      ]
+    },
+    {
+      "fixture": "hooks/input.tsx",
+      "componentName": "useCounter",
+      "prediction": {
+        "outcome": "ready",
+        "likelihood": "possible"
+      },
+      "compilerObservation": {
+        "componentName": "useCounter",
+        "outcome": "optimized",
+        "reason": "Successfully compiled and reactive scopes auto-memoized.",
+        "compilerVersion": "19.0.0-reference"
+      },
+      "result": "agreement",
+      "notes": [
+        "Both static analyzer and React Compiler agree component is optimized."
+      ]
+    },
+    {
+      "fixture": "hooks/input.tsx",
+      "componentName": "useBrokenCounter",
+      "rule": "no-set-state-in-render",
+      "prediction": {
+        "outcome": "bailout",
+        "likelihood": "definite",
+        "reason": "A state updater (setState or useReducer dispatch) is called unconditionally during the render phase. This creates an infinite re-render loop. The compiler cannot and will not attempt to memoize a component with this pattern."
+      },
+      "compilerObservation": {
+        "componentName": "useBrokenCounter",
+        "outcome": "bailed-out",
+        "reason": "Unconditional state update 'setCount' called during render.",
+        "compilerVersion": "19.0.0-reference"
+      },
+      "result": "agreement",
+      "notes": [
+        "Both static analyzer and React Compiler agree component bails out."
+      ]
+    },
+    {
+      "fixture": "nested-components/input.tsx",
+      "componentName": "CleanParent",
+      "prediction": {
+        "outcome": "ready",
+        "likelihood": "possible"
+      },
+      "compilerObservation": {
+        "componentName": "CleanParent",
+        "outcome": "optimized",
+        "reason": "Successfully compiled and reactive scopes auto-memoized.",
+        "compilerVersion": "19.0.0-reference"
+      },
+      "result": "agreement",
+      "notes": [
+        "Both static analyzer and React Compiler agree component is optimized."
+      ]
+    },
+    {
+      "fixture": "nested-components/input.tsx",
+      "componentName": "CleanChild",
+      "prediction": {
+        "outcome": "ready",
+        "likelihood": "possible"
+      },
+      "compilerObservation": {
+        "componentName": "CleanChild",
+        "outcome": "optimized",
+        "reason": "Successfully compiled and reactive scopes auto-memoized.",
+        "compilerVersion": "19.0.0-reference"
+      },
+      "result": "agreement",
+      "notes": [
+        "Both static analyzer and React Compiler agree component is optimized."
+      ]
+    },
+    {
+      "fixture": "nested-components/input.tsx",
+      "componentName": "ParentWithNestedComponent",
+      "rule": "no-nested-components",
+      "prediction": {
+        "outcome": "bailout",
+        "likelihood": "definite",
+        "reason": "A React component or hook is defined inside another component's render body. This creates a new function reference on every render, which prevents the inner component from ever receiving stable props and defeats any memoization applied to it."
+      },
+      "compilerObservation": {
+        "componentName": "ParentWithNestedComponent",
+        "outcome": "bailed-out",
+        "reason": "Nested component definition 'InlineChild' in render body.",
+        "compilerVersion": "19.0.0-reference"
+      },
+      "result": "agreement",
+      "notes": [
+        "Both static analyzer and React Compiler agree component bails out."
+      ]
+    },
+    {
+      "fixture": "nested-components/input.tsx",
+      "componentName": "InlineChild",
+      "rule": "no-nested-components",
+      "prediction": {
+        "outcome": "bailout",
+        "likelihood": "definite",
+        "reason": "A React component or hook is defined inside another component's render body. This creates a new function reference on every render, which prevents the inner component from ever receiving stable props and defeats any memoization applied to it."
+      },
+      "compilerObservation": {
+        "componentName": "InlineChild",
+        "outcome": "optimized",
+        "reason": "Successfully compiled and reactive scopes auto-memoized.",
+        "compilerVersion": "19.0.0-reference"
+      },
+      "result": "mismatch",
+      "notes": [
+        "⚠ FALSE POSITIVE: Static analyzer predicted BAILOUT, but compiler OPTIMIZED.",
+        "Static reason: A React component or hook is defined inside another component's render body. This creates a new function reference on every render, which prevents the inner component from ever receiving stable props and defeats any memoization applied to it."
+      ]
+    },
+    {
+      "fixture": "ref-access/ref-dep.tsx",
+      "componentName": "RefAsDependencyComp",
+      "rule": "no-ref-as-dependency",
+      "prediction": {
+        "outcome": "bailout",
+        "likelihood": "likely",
+        "reason": "A ref object is listed as a hook dependency. Ref objects are stable references (same object every render) but their .current value changes imperatively without notifying React. Using a ref as a dependency creates a stale-closure hazard that the compiler cannot reason about."
+      },
+      "compilerObservation": {
+        "componentName": "RefAsDependencyComp",
+        "outcome": "bailed-out",
+        "reason": "Read of ref.current during render.",
+        "compilerVersion": "19.0.0-reference"
+      },
+      "result": "agreement",
+      "notes": [
+        "Both static analyzer and React Compiler agree component bails out."
+      ]
+    },
+    {
+      "fixture": "ref-access/ref-read.tsx",
+      "componentName": "RefReadInRenderComp",
+      "rule": "no-ref-read-in-render",
+      "prediction": {
+        "outcome": "bailout",
+        "likelihood": "likely",
+        "reason": "ref.current is read during the render phase. Refs are intentionally excluded from React's reactivity system — their value changes without triggering re-renders. The compiler cannot include ref values in reactive scopes, making memoized output based on ref.current unreliable."
+      },
+      "compilerObservation": {
+        "componentName": "RefReadInRenderComp",
+        "outcome": "bailed-out",
+        "reason": "Read of ref.current during render.",
+        "compilerVersion": "19.0.0-reference"
+      },
+      "result": "agreement",
+      "notes": [
+        "Both static analyzer and React Compiler agree component bails out."
+      ]
+    },
+    {
+      "fixture": "ref-read/input.tsx",
+      "componentName": "ReadsRefInRender",
+      "rule": "no-ref-read-in-render",
+      "prediction": {
+        "outcome": "bailout",
+        "likelihood": "likely",
+        "reason": "ref.current is read during the render phase. Refs are intentionally excluded from React's reactivity system — their value changes without triggering re-renders. The compiler cannot include ref values in reactive scopes, making memoized output based on ref.current unreliable."
+      },
+      "compilerObservation": {
+        "componentName": "ReadsRefInRender",
+        "outcome": "bailed-out",
+        "reason": "Read of ref.current during render.",
+        "compilerVersion": "19.0.0-reference"
+      },
+      "result": "agreement",
+      "notes": [
+        "Both static analyzer and React Compiler agree component bails out."
+      ]
+    },
+    {
+      "fixture": "render-mutation/basic.tsx",
+      "componentName": "RenderMutationComp",
+      "rule": "no-render-mutation",
+      "prediction": {
+        "outcome": "bailout",
+        "likelihood": "definite",
+        "reason": "A value is mutated inside the render body. React requires render to be a pure function: calling it twice with the same inputs must produce the same output. Mutations break this guarantee and prevent the compiler from safely skipping re-renders."
+      },
+      "compilerObservation": {
+        "componentName": "RenderMutationComp",
+        "outcome": "bailed-out",
+        "reason": "Render-phase mutation of local variable 'count'.",
+        "compilerVersion": "19.0.0-reference"
+      },
+      "result": "agreement",
+      "notes": [
+        "Both static analyzer and React Compiler agree component bails out."
+      ]
+    },
+    {
+      "fixture": "render-mutation/global-mutation.tsx",
+      "componentName": "GlobalMutationComp",
+      "rule": "no-render-mutation",
+      "prediction": {
+        "outcome": "bailout",
+        "likelihood": "definite",
+        "reason": "A value is mutated inside the render body. React requires render to be a pure function: calling it twice with the same inputs must produce the same output. Mutations break this guarantee and prevent the compiler from safely skipping re-renders."
+      },
+      "compilerObservation": {
+        "componentName": "GlobalMutationComp",
+        "outcome": "bailed-out",
+        "reason": "Render-phase mutation of local variable 'globalCounter'.",
+        "compilerVersion": "19.0.0-reference"
+      },
+      "result": "agreement",
+      "notes": [
+        "Both static analyzer and React Compiler agree component bails out."
+      ]
+    },
+    {
+      "fixture": "render-mutation/input.tsx",
+      "componentName": "MutatesLocal",
+      "rule": "no-render-mutation",
+      "prediction": {
+        "outcome": "bailout",
+        "likelihood": "definite",
+        "reason": "A value is mutated inside the render body. React requires render to be a pure function: calling it twice with the same inputs must produce the same output. Mutations break this guarantee and prevent the compiler from safely skipping re-renders."
+      },
+      "compilerObservation": {
+        "componentName": "MutatesLocal",
+        "outcome": "bailed-out",
+        "reason": "Render-phase mutation of local variable 'x'.",
+        "compilerVersion": "19.0.0-reference"
+      },
+      "result": "agreement",
+      "notes": [
+        "Both static analyzer and React Compiler agree component bails out."
+      ]
+    },
+    {
+      "fixture": "render-mutation/mutation-after-jsx.tsx",
+      "componentName": "MutationAfterJsxComp",
+      "rule": "no-render-mutation",
+      "prediction": {
+        "outcome": "bailout",
+        "likelihood": "definite",
+        "reason": "A value is mutated inside the render body. React requires render to be a pure function: calling it twice with the same inputs must produce the same output. Mutations break this guarantee and prevent the compiler from safely skipping re-renders."
+      },
+      "compilerObservation": {
+        "componentName": "MutationAfterJsxComp",
+        "outcome": "bailed-out",
+        "reason": "Render-phase mutation of property/object.",
+        "compilerVersion": "19.0.0-reference"
+      },
+      "result": "agreement",
+      "notes": [
+        "Both static analyzer and React Compiler agree component bails out."
+      ]
+    },
+    {
+      "fixture": "render-mutation/prop-mutation.tsx",
+      "componentName": "PropMutationComp",
+      "rule": "no-prop-state-mutation",
+      "prediction": {
+        "outcome": "bailout",
+        "likelihood": "definite",
+        "reason": "A prop or state value is mutated during render. Props and state must be treated as read-only. Mutating them during render violates the Rules of React and prevents the compiler from relying on referential stability to decide when to skip re-renders."
+      },
+      "compilerObservation": {
+        "componentName": "PropMutationComp",
+        "outcome": "bailed-out",
+        "reason": "Mutating method 'push' called during render.",
+        "compilerVersion": "19.0.0-reference"
+      },
+      "result": "agreement",
+      "notes": [
+        "Both static analyzer and React Compiler agree component bails out."
+      ]
+    },
+    {
+      "fixture": "state-update/input.tsx",
+      "componentName": "SetsStateInRender",
+      "rule": "no-set-state-in-render",
+      "prediction": {
+        "outcome": "bailout",
+        "likelihood": "definite",
+        "reason": "A state updater (setState or useReducer dispatch) is called unconditionally during the render phase. This creates an infinite re-render loop. The compiler cannot and will not attempt to memoize a component with this pattern."
+      },
+      "compilerObservation": {
+        "componentName": "SetsStateInRender",
+        "outcome": "bailed-out",
+        "reason": "Unconditional state update 'setVal' called during render.",
+        "compilerVersion": "19.0.0-reference"
+      },
+      "result": "agreement",
+      "notes": [
+        "Both static analyzer and React Compiler agree component bails out."
+      ]
+    },
+    {
+      "fixture": "state-update/set-state-in-render.tsx",
+      "componentName": "StateUpdateInRenderComp",
+      "rule": "no-set-state-in-render",
+      "prediction": {
+        "outcome": "bailout",
+        "likelihood": "definite",
+        "reason": "A state updater (setState or useReducer dispatch) is called unconditionally during the render phase. This creates an infinite re-render loop. The compiler cannot and will not attempt to memoize a component with this pattern."
+      },
+      "compilerObservation": {
+        "componentName": "StateUpdateInRenderComp",
+        "outcome": "bailed-out",
+        "reason": "Unconditional state update 'setCount' called during render.",
+        "compilerVersion": "19.0.0-reference"
+      },
+      "result": "agreement",
+      "notes": [
+        "Both static analyzer and React Compiler agree component bails out."
+      ]
+    }
+  ],
+  "mismatches": [
+    {
+      "fixture": "components/nested-component.tsx",
+      "componentName": "InnerChildComp",
+      "rule": "no-nested-components",
+      "prediction": {
+        "outcome": "bailout",
+        "likelihood": "definite",
+        "reason": "A React component or hook is defined inside another component's render body. This creates a new function reference on every render, which prevents the inner component from ever receiving stable props and defeats any memoization applied to it."
+      },
+      "compilerObservation": {
+        "componentName": "InnerChildComp",
+        "outcome": "optimized",
+        "reason": "Successfully compiled and reactive scopes auto-memoized.",
+        "compilerVersion": "19.0.0-reference"
+      },
+      "result": "mismatch",
+      "notes": [
+        "⚠ FALSE POSITIVE: Static analyzer predicted BAILOUT, but compiler OPTIMIZED.",
+        "Static reason: A React component or hook is defined inside another component's render body. This creates a new function reference on every render, which prevents the inner component from ever receiving stable props and defeats any memoization applied to it."
+      ]
+    },
+    {
+      "fixture": "components/unstable-default-props.tsx",
+      "componentName": "UnstableDefaultPropsComp",
+      "rule": "no-unstable-default-props",
+      "prediction": {
+        "outcome": "bailout",
+        "likelihood": "likely",
+        "reason": "An object or array literal is used as a prop default value inside the function signature. Each render creates a new reference for that default value, making prop-equality comparisons always fail and causing unnecessary downstream re-renders."
+      },
+      "compilerObservation": {
+        "componentName": "UnstableDefaultPropsComp",
+        "outcome": "optimized",
+        "reason": "Successfully compiled and reactive scopes auto-memoized.",
+        "compilerVersion": "19.0.0-reference"
+      },
+      "result": "mismatch",
+      "notes": [
+        "⚠ FALSE POSITIVE: Static analyzer predicted BAILOUT, but compiler OPTIMIZED.",
+        "Static reason: An object or array literal is used as a prop default value inside the function signature. Each render creates a new reference for that default value, making prop-equality comparisons always fail and causing unnecessary downstream re-renders."
+      ]
+    },
+    {
+      "fixture": "directives/function-directives.tsx",
+      "componentName": "StillReady",
+      "prediction": {
+        "outcome": "ready",
+        "likelihood": "possible"
+      },
+      "compilerObservation": {
+        "componentName": "StillReady",
+        "outcome": "skipped",
+        "reason": "Skipped due to \"use no memo\" directive.",
+        "compilerVersion": "19.0.0-reference"
+      },
+      "result": "mismatch",
+      "notes": [
+        "Mismatch between prediction (ready) and compiler observation (skipped)."
+      ]
+    },
+    {
+      "fixture": "directives/function-directives.tsx",
+      "componentName": "ForcedIn",
+      "prediction": {
+        "outcome": "forced-opt-in",
+        "likelihood": "possible"
+      },
+      "compilerObservation": {
+        "componentName": "ForcedIn",
+        "outcome": "skipped",
+        "reason": "Skipped due to \"use no memo\" directive.",
+        "compilerVersion": "19.0.0-reference"
+      },
+      "result": "mismatch",
+      "notes": [
+        "Mismatch between prediction (forced-opt-in) and compiler observation (skipped)."
+      ]
+    },
+    {
+      "fixture": "nested-components/input.tsx",
+      "componentName": "InlineChild",
+      "rule": "no-nested-components",
+      "prediction": {
+        "outcome": "bailout",
+        "likelihood": "definite",
+        "reason": "A React component or hook is defined inside another component's render body. This creates a new function reference on every render, which prevents the inner component from ever receiving stable props and defeats any memoization applied to it."
+      },
+      "compilerObservation": {
+        "componentName": "InlineChild",
+        "outcome": "optimized",
+        "reason": "Successfully compiled and reactive scopes auto-memoized.",
+        "compilerVersion": "19.0.0-reference"
+      },
+      "result": "mismatch",
+      "notes": [
+        "⚠ FALSE POSITIVE: Static analyzer predicted BAILOUT, but compiler OPTIMIZED.",
+        "Static reason: A React component or hook is defined inside another component's render body. This creates a new function reference on every render, which prevents the inner component from ever receiving stable props and defeats any memoization applied to it."
+      ]
+    }
+  ]
+}
