@@ -229,11 +229,11 @@ describe('Nested component detection', () => {
     assert.equal(comp.status, 'ready');
   });
 
-  test('ParentWithNestedComponent is predicted-bailout', async () => {
+  test('ParentWithNestedComponent is at-risk', async () => {
     const report = await analyseBailouts({ target: fixture('nested-components/input.tsx') });
     const comp = getComponent(report.components, 'ParentWithNestedComponent');
     assert.ok(comp);
-    assert.equal(comp.status, 'predicted-bailout');
+    assert.equal(comp.status, 'at-risk');
     assert.ok(comp.violations.some((v) => v.bailoutCategory === 'nested-component-definition'));
   });
 });

@@ -69,6 +69,22 @@ export type BailoutCategory =
   /** Catch-all for patterns not yet classified */
   | 'unknown';
 
+// ─── Rule Impact Classification ───────────────────────────────────────────────
+
+/**
+ * Stable classification of a rule's impact on React Compiler optimization.
+ *
+ * - `compiler-bailout` — Definite or documented compiler bailout pattern.
+ * - `compiler-risk`    — Risk to optimization stability, referential equality, or scope caching.
+ * - `react-pattern`    — React architectural / anti-pattern concern that may not guarantee compiler bailout.
+ * - `best-practice`   — General code hygiene or style practice.
+ */
+export type RuleImpact =
+  | 'compiler-bailout'
+  | 'compiler-risk'
+  | 'react-pattern'
+  | 'best-practice';
+
 // ─── Confidence model ─────────────────────────────────────────────────────────
 
 /**
@@ -102,24 +118,30 @@ export type DetectionConfidence = 'high' | 'medium' | 'low';
  * A structured prediction for a single component or hook.
  *
  * Intended to be read as: "Based on static analysis, the predicted compiler
- * outcome is [outcome] with [confidence] likelihood."
+ * outcome is [outcome] with [confidence] likelihood and [impact] classification."
  */
 export interface CompilerPrediction {
   /**
    * The predicted compiler outcome for this component.
    *
-   * - `ready`     — No known patterns that would prevent optimisation.
-   * - `bailout`   — One or more patterns strongly suggest the compiler will skip this.
-   * - `at-risk`   — Patterns present that may prevent optimisation depending on context.
-   * - `opted-out` — An explicit "use no memo" directive was found.
+   * - `ready`            — No known patterns that would prevent optimisation.
+   * - `bailout`          — One or more patterns strongly suggest the compiler will skip this.
+   * - `at-risk`          — Patterns present that may prevent optimisation depending on context.
+   * - `opted-out`        — An explicit "use no memo" directive was found.
+   * - `forced-opt-in`    — An explicit "use memo" directive was found.
    */
   outcome: 'ready' | 'bailout' | 'at-risk' | 'opted-out' | 'forced-opt-in';
 
   /**
    * How likely this prediction is to be correct.
-   * Derived from the most severe violation's bailoutLikelihood.
+   * Derived from the primary violation's bailoutLikelihood.
    */
   likelihood: BailoutLikelihood;
+
+  /**
+   * Impact classification of the primary rule violation.
+   */
+  impact: RuleImpact;
 
   /**
    * A brief human-readable reason for the prediction.
@@ -132,9 +154,6 @@ export interface CompilerPrediction {
 
 /**
  * A single rule violation enriched with compiler-analysis metadata.
- *
- * The `bailoutLikelihood` and `detectionConfidence` fields are intentionally
- * separate — see their type documentation above for the distinction.
  */
 export interface AnnotatedViolation {
   /** Rule that produced this violation (e.g. "no-ref-read-in-render") */
@@ -151,26 +170,17 @@ export interface AnnotatedViolation {
   // ── Bailout analysis ──
   /** The pure-react-check bailout category (stable, tool-owned) */
   bailoutCategory: BailoutCategory;
-  /**
-   * A stable, tool-authored explanation of why this pattern is problematic
-   * for compiler optimisation. Written in terms of React semantics, not
-   * compiler internals, so it won't break when the compiler changes.
-   */
+  /** Rule impact classification */
+  impact: RuleImpact;
+  /** Tool-authored explanation of why this pattern is problematic */
   reason: string;
-  /**
-   * Optional supplementary information about the specific compiler diagnostic
-   * this corresponds to. Treated as informational only — NOT a stable API.
-   * @see compilerNote
-   */
+  /** Optional supplementary information about compiler behavior */
   compilerNote?: string;
   /** How likely this violation is to cause a compiler bailout */
   bailoutLikelihood: BailoutLikelihood;
   /** How confident the analyser is that it correctly detected this pattern */
   detectionConfidence: DetectionConfidence;
-  /**
-   * Which optimisation category is blocked by this violation.
-   * Written in pure-react-check terms, not compiler-internal terms.
-   */
+  /** Which optimisation category is blocked by this violation */
   blockedOptimization: string;
 }
 
@@ -193,29 +203,15 @@ export interface CompilerDirective {
 
 // ─── Per-component status ─────────────────────────────────────────────────────
 
-/**
- * The predicted compiler status of a single component or hook.
- *
- * Use these values in the JSON API — they are stable across tool versions.
- *
- * Terminal labels:
- *   ready            → ✓ COMPILER READY
- *   predicted-bailout → ✗ PREDICTED BAILOUT
- *   at-risk          → ⚠ AT RISK
- *   opted-out        → ○ OPTED OUT
- *   forced-opt-in    → ⚡ FORCED OPT-IN
- */
 export type ComponentStatus =
   | 'ready'            // No known bailout signals
-  | 'predicted-bailout' // Definite or likely bailout patterns detected
-  | 'at-risk'          // Possible bailout patterns detected
+  | 'predicted-bailout' // Definite or likely compiler-bailout rules triggered
+  | 'at-risk'          // Compiler-risk or react-pattern rules triggered
   | 'opted-out'        // "use no memo" found
   | 'forced-opt-in';   // "use memo" found
 
-/** Whether this entry is a React component or a custom hook */
 export type ComponentKind = 'component' | 'hook';
 
-/** Summary for a single component or hook */
 export interface ComponentBailoutSummary {
   /** Component or hook name */
   name: string;
@@ -231,10 +227,7 @@ export interface ComponentBailoutSummary {
   violations: AnnotatedViolation[];
   /** Compiler directives that apply to this component */
   directives: CompilerDirective[];
-  /**
-   * The most important bailout reason (from the highest-severity violation).
-   * null when there are no violations.
-   */
+  /** Primary bailout reason from top violation */
   primaryBailoutReason: string | null;
   /** Structured compiler outcome prediction */
   prediction: CompilerPrediction;
@@ -242,151 +235,68 @@ export interface ComponentBailoutSummary {
 
 // ─── Readiness scoring ────────────────────────────────────────────────────────
 
-/**
- * Readiness statistics for the scanned codebase.
- *
- * Scoring formula (scoreVersion = 2):
- * ─────────────────────────────────────────────────────────────────
- *  Each component contributes a "readiness weight" between 0 and 1:
- *
- *   ready            → 1.0
- *   forced-opt-in    → 1.0   (explicitly requested optimisation)
- *   at-risk          → 0.5   (uncertain; penalised but not fully)
- *   opted-out        → 0.5   (intentional, but not compiler-ready)
- *   predicted-bailout → 0.0  (hard blocked)
- *
- *  Within a predicted-bailout component, violations further weight the score:
- *   definite (high detection) → 1.0 penalty
- *   definite (medium)         → 0.9
- *   likely   (high)           → 0.5 penalty
- *   likely   (medium/low)     → 0.4 penalty
- *   possible                  → 0.2 penalty
- *
- *  compilerReadinessPercent = (sum of component weights / total components) × 100
- *  Returns 100 when no components are found.
- * ─────────────────────────────────────────────────────────────────
- *
- * This score is a HEURISTIC. It is not a guarantee of compiler behaviour.
- * The score will change across scoreVersion releases.
- */
 export interface ReadinessStats {
-  /**
-   * The heuristic compiler-readiness score (0–100).
-   * See scoring formula above.
-   */
   compilerReadinessPercent: number;
-
-  /** Total source files scanned */
   totalFiles: number;
-  /** Total React components and hooks detected */
   totalComponents: number;
-
-  /** Components with no known bailout signals */
   readyComponents: number;
-  /** Components with definite or likely bailout patterns */
   predictedBailoutComponents: number;
-  /** Components with possible (uncertain) bailout patterns */
   atRiskComponents: number;
-  /** Components with "use no memo" directive */
   optedOutComponents: number;
-  /** Components with "use memo" directive */
   forcedOptInComponents: number;
-
-  /** Total number of annotated violations across all components */
   totalViolations: number;
-
-  /** Violations classified as definite bailout risk */
   definiteLikelihood: number;
-  /** Violations classified as likely bailout risk */
   likelyLikelihood: number;
-  /** Violations classified as possible (uncertain) risk */
   possibleLikelihood: number;
 }
 
 // ─── Baseline / regression ────────────────────────────────────────────────────
 
-/**
- * A serialisable baseline snapshot written by `--baseline` and read by `--diff`.
- */
 export interface BailoutBaseline {
-  /** ISO 8601 timestamp when the baseline was captured */
   capturedAt: string;
-  /** The target that was scanned */
   target: string;
-  /** schemaVersion at baseline capture time */
   schemaVersion: number;
-  /** scoreVersion at baseline capture time */
   scoreVersion: number;
-  /** Readiness percent at baseline capture time */
   compilerReadinessPercent: number;
-  /** Snapshot of per-component statuses keyed by "filePath:name" */
   components: Record<string, {
     status: ComponentStatus;
     violationCount: number;
   }>;
 }
 
-/**
- * The result of comparing a current report against a stored baseline.
- */
 export interface RegressionReport {
-  /** The baseline that was compared against */
   baseline: BailoutBaseline;
-  /** Previous readiness percent */
   previousReadiness: number;
-  /** Current readiness percent */
   currentReadiness: number;
-  /** Positive = improvement, negative = regression */
   readinessDelta: number;
-
-  /** Components that are new since the baseline */
   newComponents: ComponentBailoutSummary[];
-  /** Components present in baseline that are now gone */
   removedComponentKeys: string[];
-  /** Components whose status changed for the worse */
   regressions: Array<{
     name: string;
     filePath: string;
     previousStatus: ComponentStatus;
     currentStatus: ComponentStatus;
   }>;
-  /** Components whose status improved */
   improvements: Array<{
     name: string;
     filePath: string;
     previousStatus: ComponentStatus;
     currentStatus: ComponentStatus;
   }>;
-
-  /** true when there are new regressions compared to baseline */
   hasRegressions: boolean;
 }
 
 // ─── Top-level report ─────────────────────────────────────────────────────────
 
 export interface BailoutReport {
-  /** Schema version — increment when fields are removed or renamed */
   schemaVersion: typeof SCHEMA_VERSION;
-  /** Scoring algorithm version */
   scoreVersion: typeof SCORE_VERSION;
-  /** Semver of pure-react-check that generated this report */
   toolVersion: string;
-  /** ISO 8601 timestamp */
   generatedAt: string;
-  /** Directory, file, or glob that was scanned */
   target: string;
-  /** All files examined */
   files: string[];
-
-  /** Per-component summaries — primary unit of the report */
   components: ComponentBailoutSummary[];
-
-  /** All compiler directives found (flat list) */
   directives: CompilerDirective[];
-
-  /** All annotated violations (flat list for easy tooling) */
   violations: AnnotatedViolation[];
-
-  /** Heuristic readiness statistics */
   stats: ReadinessStats;
 }

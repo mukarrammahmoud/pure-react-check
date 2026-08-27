@@ -40,6 +40,9 @@ const MUTATING_METHODS = new Set(['push', 'pop', 'splice', 'sort', 'reverse', 's
 /**
  * Reference implementation modeling documented React Compiler optimization rules.
  * Used when the compiler package is not installed or available locally.
+ *
+ * IMPORTANT: Observations produced here carry observationSource = "reference-model".
+ * They must NOT be represented as official React Compiler ground truth.
  */
 export class ReferenceCompilerAdapter implements CompilerAdapter {
   name = 'Reference Compiler Model';
@@ -82,6 +85,7 @@ export class ReferenceCompilerAdapter implements CompilerAdapter {
             observations.push({
               componentName: name,
               outcome: 'skipped',
+              observationSource: 'reference-model',
               reason: 'Skipped due to "use no memo" directive.',
               compilerVersion: '19.0.0-reference',
             });
@@ -206,6 +210,7 @@ export class ReferenceCompilerAdapter implements CompilerAdapter {
             observations.push({
               componentName: name,
               outcome: 'bailed-out',
+              observationSource: 'reference-model',
               reason: bailoutReason,
               compilerVersion: '19.0.0-reference',
             });
@@ -213,6 +218,7 @@ export class ReferenceCompilerAdapter implements CompilerAdapter {
             observations.push({
               componentName: name,
               outcome: 'optimized',
+              observationSource: 'reference-model',
               reason: 'Successfully compiled and reactive scopes auto-memoized.',
               compilerVersion: '19.0.0-reference',
             });
@@ -267,6 +273,7 @@ export class ReactCompilerAdapter implements CompilerAdapter {
           observations.push({
             componentName: name,
             outcome: isMemoizedInOutput ? 'optimized' : 'bailed-out',
+            observationSource: 'react-compiler',
             compilerVersion: this.version,
           });
         },

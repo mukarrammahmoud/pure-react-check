@@ -1,47 +1,33 @@
 /**
- * Bailout Analyser (v2)
- *
- * Pipeline:
- *  1. Run the pure-react-check rule scanner (collects Violations)
- *  2. Run the directive scanner (collects "use no memo" / "use memo")
- *  3. Run the component extractor (finds components and hooks)
- *  4. Annotate each violation with bail-out metadata (rule-map v2)
- *  5. Group by component; compute CompilerPrediction + ComponentStatus
- *  6. Compute ReadinessStats with scoreVersion = 2
- *  7. Return BailoutReport
- *
- * This module does NOT run the React Compiler. All results are predictions
- * based on static pattern matching.
+ * pure-react-check — Bailout Analysis Engine (schema v2)
  */
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { scanDirectory } from '../scanner.js';
-import type { ScanResult } from '../scanner.js';
+import { scanDirectory, type ScanResult } from '../scanner.js';
 import type { Violation } from '../rules/types.js';
 import { getBailoutMapping } from './rule-map.js';
 import { buildDirectiveVisitors } from './directive-scanner.js';
-import { buildComponentVisitors, type DetectedComponent } from './component-extractor.js';
+import {
+  buildComponentVisitors,
+  type DetectedComponent,
+} from './component-extractor.js';
 import {
   SCHEMA_VERSION,
   SCORE_VERSION,
+  type BailoutBaseline,
+  type BailoutReport,
+  type AnnotatedViolation,
+  type CompilerDirective,
+  type CompilerPrediction,
+  type ComponentBailoutSummary,
+  type ComponentKind,
+  type ComponentStatus,
+  type ReadinessStats,
+  type RegressionReport,
+  type BailoutLikelihood,
+  type DetectionConfidence,
 } from './types.js';
-import type {
-  AnnotatedViolation,
-  BailoutBaseline,
-  BailoutReport,
-  CompilerDirective,
-  CompilerPrediction,
-  ComponentBailoutSummary,
-  ComponentKind,
-  ComponentStatus,
-  DetectionConfidence,
-  BailoutLikelihood,
-  RegressionReport,
-  ReadinessStats,
-} from './types.js';
-
-// ─── Tool version ─────────────────────────────────────────────────────────────
 
 const TOOL_VERSION = '1.2.0';
 
@@ -56,6 +42,7 @@ function annotateViolation(v: Violation): AnnotatedViolation {
     message: v.message,
     recommendation: v.recommendation,
     bailoutCategory: m.category,
+    impact: m.impact,
     reason: m.reason,
     compilerNote: m.compilerNote,
     bailoutLikelihood: m.bailoutLikelihood,
@@ -85,10 +72,12 @@ function computeStatus(
     return hasOptIn ? 'forced-opt-in' : 'ready';
   }
 
-  const hasDefinite = violations.some((v) => v.bailoutLikelihood === 'definite');
-  const hasLikely = violations.some((v) => v.bailoutLikelihood === 'likely');
+  // Only classify as predicted-bailout if there is a violation with compiler-bailout impact
+  const hasDefiniteBailout = violations.some(
+    (v) => v.impact === 'compiler-bailout' && v.bailoutLikelihood !== 'possible',
+  );
 
-  if (hasDefinite || hasLikely) return 'predicted-bailout';
+  if (hasDefiniteBailout) return 'predicted-bailout';
   return 'at-risk';
 }
 
@@ -116,6 +105,7 @@ function buildPrediction(
   return {
     outcome,
     likelihood: topViolation?.bailoutLikelihood ?? 'possible',
+    impact: topViolation?.impact ?? 'best-practice',
     reason: topViolation?.reason,
   };
 }
@@ -134,11 +124,6 @@ function pickPrimaryReason(violations: AnnotatedViolation[]): string | null {
 
 // ─── Scoring (scoreVersion = 2) ───────────────────────────────────────────────
 
-/**
- * Component-level readiness weight.
- *
- * Formula details are documented in ReadinessStats in types.ts.
- */
 function componentWeight(comp: ComponentBailoutSummary): number {
   switch (comp.status) {
     case 'ready':
@@ -148,7 +133,6 @@ function componentWeight(comp: ComponentBailoutSummary): number {
     case 'opted-out':
       return 0.5;
     case 'predicted-bailout': {
-      // Further penalise by the worst violation's likelihood × confidence
       const penaltyMap: Record<
         BailoutLikelihood,
         Record<DetectionConfidence, number>
@@ -230,7 +214,7 @@ async function runExtraPass(
       traverse(ast, buildComponentVisitors(filePath, fileComponents));
       allComponents.push(...fileComponents);
     } catch {
-      // Parse errors already reported by the main scanner
+      // Parse errors reported by main scanner
     }
   }
 
@@ -251,21 +235,18 @@ async function resolveAbsoluteFiles(target: string): Promise<string[]> {
     absoluteFiles = [absoluteTarget];
   } else if (targetStats?.isDirectory()) {
     absoluteFiles = await fastGlob('**/*.{js,jsx,ts,tsx}', {
-      absolute: true,
       cwd: absoluteTarget,
-      ignore: ['**/node_modules/**'],
-      onlyFiles: true,
+      absolute: true,
+      ignore: ['**/node_modules/**', '**/dist/**', '**/build/**'],
     });
   } else {
     absoluteFiles = await fastGlob(target, {
       absolute: true,
-      cwd: process.cwd(),
-      ignore: ['**/node_modules/**'],
-      onlyFiles: true,
+      ignore: ['**/node_modules/**', '**/dist/**', '**/build/**'],
     });
   }
 
-  return absoluteFiles.sort((a, b) => a.localeCompare(b));
+  return absoluteFiles;
 }
 
 // ─── Public options ───────────────────────────────────────────────────────────
@@ -292,8 +273,7 @@ export async function analyseBailouts(
 
   const annotated: AnnotatedViolation[] = scanResult.violations.map(annotateViolation);
 
-  // ── Group violations and directives by component ─────────────────────────
-
+  // Group violations and directives by component
   const componentSummaries: ComponentBailoutSummary[] = [];
 
   for (const comp of detectedComponents) {
@@ -370,78 +350,74 @@ export function loadBaseline(baselineFile = BASELINE_FILE): BailoutBaseline | nu
   const filePath = path.resolve(process.cwd(), baselineFile);
   if (!fs.existsSync(filePath)) return null;
   try {
-    return JSON.parse(fs.readFileSync(filePath, 'utf-8')) as BailoutBaseline;
+    const text = fs.readFileSync(filePath, 'utf-8');
+    return JSON.parse(text) as BailoutBaseline;
   } catch {
     return null;
   }
 }
 
-// ─── Regression comparison ────────────────────────────────────────────────────
-
-const STATUS_ORDER: Record<ComponentStatus, number> = {
-  ready: 0,
-  'forced-opt-in': 0,
-  'at-risk': 1,
-  'opted-out': 2,
-  'predicted-bailout': 3,
-};
-
 export function compareToBaseline(
-  report: BailoutReport,
+  current: BailoutReport,
   baseline: BailoutBaseline,
 ): RegressionReport {
-  const currentMap = new Map<string, ComponentBailoutSummary>(
-    report.components.map((c) => [`${c.filePath}:${c.name}`, c]),
+  const currentMap = new Map(
+    current.components.map((c) => [`${c.filePath}:${c.name}`, c]),
   );
 
-  const newComponents: ComponentBailoutSummary[] = [];
-  const removedComponentKeys: string[] = [];
   const regressions: RegressionReport['regressions'] = [];
   const improvements: RegressionReport['improvements'] = [];
+  const newComponents: ComponentBailoutSummary[] = [];
 
-  // Find regressions and improvements in existing components
-  for (const [key, baselineComp] of Object.entries(baseline.components)) {
-    const current = currentMap.get(key);
-    if (!current) {
-      removedComponentKeys.push(key);
-      continue;
-    }
+  const statusSeverity: Record<ComponentStatus, number> = {
+    ready: 0,
+    'forced-opt-in': 0,
+    'opted-out': 1,
+    'at-risk': 2,
+    'predicted-bailout': 3,
+  };
 
-    const prevOrder = STATUS_ORDER[baselineComp.status];
-    const currOrder = STATUS_ORDER[current.status];
+  for (const comp of current.components) {
+    const key = `${comp.filePath}:${comp.name}`;
+    const baseEntry = baseline.components[key];
 
-    if (currOrder > prevOrder) {
-      regressions.push({
-        name: current.name,
-        filePath: current.filePath,
-        previousStatus: baselineComp.status,
-        currentStatus: current.status,
-      });
-    } else if (currOrder < prevOrder) {
-      improvements.push({
-        name: current.name,
-        filePath: current.filePath,
-        previousStatus: baselineComp.status,
-        currentStatus: current.status,
-      });
-    }
-  }
-
-  // Find new components
-  for (const [key, comp] of currentMap) {
-    if (!baseline.components[key]) {
+    if (!baseEntry) {
       newComponents.push(comp);
+    } else {
+      const prevSev = statusSeverity[baseEntry.status];
+      const currSev = statusSeverity[comp.status];
+
+      if (currSev > prevSev) {
+        regressions.push({
+          name: comp.name,
+          filePath: comp.filePath,
+          previousStatus: baseEntry.status,
+          currentStatus: comp.status,
+        });
+      } else if (currSev < prevSev) {
+        improvements.push({
+          name: comp.name,
+          filePath: comp.filePath,
+          previousStatus: baseEntry.status,
+          currentStatus: comp.status,
+        });
+      }
     }
   }
 
-  const readinessDelta =
-    report.stats.compilerReadinessPercent - baseline.compilerReadinessPercent;
+  const currentKeys = new Set(currentMap.keys());
+  const removedComponentKeys = Object.keys(baseline.components).filter(
+    (key) => !currentKeys.has(key),
+  );
+
+  const previousReadiness = baseline.compilerReadinessPercent;
+  const currentReadiness = current.stats.compilerReadinessPercent;
 
   return {
     baseline,
-    previousReadiness: baseline.compilerReadinessPercent,
-    currentReadiness: report.stats.compilerReadinessPercent,
-    readinessDelta,
+    previousReadiness,
+    currentReadiness,
+    readinessDelta: currentReadiness - previousReadiness,
     newComponents,
     removedComponentKeys,
     regressions,

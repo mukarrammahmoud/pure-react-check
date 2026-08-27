@@ -50,14 +50,20 @@ export function buildScopeAliasMap(funcPath: NodePath<t.Function>): AliasMap {
           line,
         });
       }
-      // Case 2: Variable aliasing property (e.g. const a = props.user)
+      // Case 2: Variable aliasing property (e.g. const a = props.user or const v = target.settings)
       else if (init.type === 'MemberExpression') {
-        const objectNode = init.object;
+        let objectNode: t.Expression | t.Super = init.object;
+        while (objectNode.type === 'MemberExpression') {
+          objectNode = objectNode.object;
+        }
+
         if (objectNode.type === 'Identifier') {
-          const sourceName = objectNode.name;
+          const rawName = objectNode.name;
+          const parentAlias = aliases.get(rawName);
+          const sourceName = parentAlias ? parentAlias.sourceName : rawName;
           const kind: AliasKind =
-            sourceName === 'props' ? 'prop' :
-            sourceName === 'state' ? 'state' : 'property';
+            sourceName === 'props' || parentAlias?.kind === 'prop' ? 'prop' :
+            sourceName === 'state' || parentAlias?.kind === 'state' ? 'state' : 'property';
 
           aliases.set(aliasName, {
             sourceName,
@@ -74,22 +80,44 @@ export function buildScopeAliasMap(funcPath: NodePath<t.Function>): AliasMap {
 }
 
 /**
- * Resolves whether a variable name is an alias of a prop or state reference.
+ * Resolves whether a variable name is an alias of a prop or state reference,
+ * walking up chained alias links up to a max depth.
  */
-export function resolveAliasSource(name: string, aliasMap: AliasMap): AliasBinding | null {
-  const direct = aliasMap.get(name);
-  if (!direct) return null;
+export function resolveAliasSource(
+  name: string,
+  aliasMap: AliasMap,
+  maxDepth = 10,
+): AliasBinding | null {
+  let currentName = name;
+  let currentBinding = aliasMap.get(currentName);
+  let depth = 0;
 
-  // Resolve chained aliases (e.g. const a = props; const b = a;)
-  const parent = aliasMap.get(direct.sourceName);
-  if (parent) {
-    return {
-      sourceName: parent.sourceName,
-      aliasName: name,
-      kind: parent.kind,
-      line: direct.line,
-    };
+  let resolvedKind: AliasKind | null = null;
+  let finalSourceName: string | null = null;
+  const initialLine = currentBinding?.line ?? 0;
+
+  while (currentBinding && depth < maxDepth) {
+    if (currentBinding.kind === 'prop' || currentBinding.kind === 'state') {
+      resolvedKind = currentBinding.kind;
+      finalSourceName = currentBinding.sourceName;
+    }
+    const nextBinding = aliasMap.get(currentBinding.sourceName);
+    if (!nextBinding) {
+      if (!finalSourceName) finalSourceName = currentBinding.sourceName;
+      if (!resolvedKind) resolvedKind = currentBinding.kind;
+      break;
+    }
+    currentName = currentBinding.sourceName;
+    currentBinding = nextBinding;
+    depth++;
   }
 
-  return direct;
+  if (!finalSourceName || !resolvedKind) return null;
+
+  return {
+    sourceName: finalSourceName,
+    aliasName: name,
+    kind: resolvedKind,
+    line: initialLine,
+  };
 }

@@ -14,8 +14,11 @@ export type {
   CompilerOutcome,
   CompilerDiagnostic,
   CompilerObservation,
-  CompatibilityComparisonResult,
+  CompatibilityClassification,
+  MismatchKind,
   CompatibilityResult,
   RuleMatrixEntry,
+  RuleReliability,
   CompatibilityReport,
+  ObservationSource,
 } from './types.js';
