@@ -72,12 +72,40 @@ Pass `--explain` for full diagnostic breakdowns:
 npx pure-react-check compiler-report ./src --explain
 ```
 
-Output includes:
-- **Detection Confidence**: `HIGH`, `MEDIUM`, or `LOW` (reliability of AST pattern matching)
-- **Bailout Likelihood**: `DEFINITE`, `LIKELY`, or `POSSIBLE` (predicted compiler behaviour)
-- **Why this matters**: Educational breakdown of the React purity violation
-- **Blocked Optimisation**: Which compiler scope optimization is prevented
-- **Suggested Direction**: Actionable refactoring guidance
+---
+
+## Compiler Compatibility & Ground Truth Layer (`compiler-compat`)
+
+`pure-react-check` includes an automated **Compiler Compatibility Layer** to continuously compare static predictions against actual React Compiler behavior across versioned fixtures.
+
+```bash
+npx pure-react-check compiler-compat
+```
+
+### Compatibility CLI Options:
+- `--format=terminal|json`: Output format (default: `terminal`).
+- `--rule=<ruleName>`: Filter verification to a single static rule (e.g. `--rule=no-render-mutation`).
+- `--fixture=<substring>`: Filter verification to specific fixture path.
+- `--ci`: Run in strict CI mode; fails if agreement rate drops below threshold.
+- `--min-agreement=<percent>`: Minimum required agreement percentage (default: `80`).
+
+### Terminal Compatibility Output:
+```text
+Pure React Check
+React Compiler Compatibility Matrix
+────────────────────────────────────────────────────────────────
+
+Compiler version:       19.0.0-reference
+Adapter name:           Reference Compiler Model
+Tool version:           1.2.0
+
+Fixtures evaluated:   46
+  ✓ Agreement:         41
+  ✗ Mismatch:           5
+  ○ Unknown:           0
+
+Agreement Rate:        89.1%
+```
 
 ---
 
@@ -88,24 +116,21 @@ Output includes:
 - `"use no memo"` at function or module level → Component status marked as `OPTED OUT` (`○ OPTED OUT`)
 - `"use memo"` at function or module level → Component status marked as `FORCED OPT-IN` (`⚡ FORCED OPT-IN`)
 
-Directives are recognized as developer intent and do not generate false-positive rule violations.
-
 ---
 
 ## CI/CD & Automation
 
 Enforce compiler readiness thresholds in your CI pipelines:
 
-### Strict CI Mode (`--ci`)
+### Preflight Readiness Check
 ```bash
 npx pure-react-check compiler-report ./src --ci --max-bailouts=0 --min-readiness=95
 ```
 
-Flags:
-- `--ci`: Enables strict status checking; exits with code `1` if criteria are not met.
-- `--max-bailouts=<n>`: Maximum allowed `predicted-bailout` components (e.g. `--max-bailouts=0`).
-- `--min-readiness=<percent>`: Minimum acceptable readiness score (e.g. `--min-readiness=90`).
-- `--fail-on=any|new`: Fail on any bailout, or only on new regressions.
+### Compiler Compatibility Verification Check
+```bash
+npx pure-react-check compiler-compat --ci --min-agreement=85
+```
 
 ---
 
@@ -113,99 +138,30 @@ Flags:
 
 Track readiness over time and catch regressions on Pull Requests:
 
-### 1. Capture a Baseline
 ```bash
+# Capture baseline snapshot
 npx pure-react-check compiler-report ./src --baseline
-```
-Saves snapshot to `.pure-react-check-baseline.json`.
 
-### 2. Compare in PR Build (`--diff`)
-```bash
+# Compare against baseline in PR
 npx pure-react-check compiler-report ./src --diff --ci
 ```
-Prints a regression summary showing score delta and any components whose status degraded. Exits with code `1` if regressions were introduced.
 
 ---
 
 ## Programmatic Node.js API
 
-Import the preflight analyzer directly in Node.js tools, dashboards, or build plugins:
+Import the preflight analyzer or compatibility suite directly:
 
 ```ts
-import {
-  analyseBailouts,
-  saveBaseline,
-  loadBaseline,
-  compareToBaseline,
-} from 'pure-react-check/api';
-
-// Run analysis
+// 1. Static Compiler Preflight Analysis
+import { analyseBailouts } from 'pure-react-check/api';
 const report = await analyseBailouts({ target: './src' });
+console.log(`Readiness: ${report.stats.compilerReadinessPercent.toFixed(1)}%`);
 
-console.log(`Schema version: ${report.schemaVersion}`); // 2
-console.log(`Score version:  ${report.scoreVersion}`);  // 2
-console.log(`Readiness:      ${report.stats.compilerReadinessPercent.toFixed(1)}%`);
-
-// Inspect per-component predictions
-for (const comp of report.components) {
-  console.log(`${comp.name} (${comp.kind}): ${comp.status}`);
-  if (comp.prediction) {
-    console.log(`  Outcome:    ${comp.prediction.outcome}`);
-    console.log(`  Likelihood: ${comp.prediction.likelihood}`);
-    console.log(`  Reason:     ${comp.prediction.reason}`);
-  }
-}
-```
-
----
-
-## JSON Output Schema (v2)
-
-Generate machine-readable JSON for integration with custom dashboards:
-
-```bash
-npx pure-react-check compiler-report ./src --format json
-```
-
-Output: `pure-react-bailout-report.json`
-
-```json
-{
-  "schemaVersion": 2,
-  "scoreVersion": 2,
-  "toolVersion": "1.2.0",
-  "generatedAt": "2026-08-27T19:00:00.000Z",
-  "target": "./src",
-  "stats": {
-    "compilerReadinessPercent": 85.0,
-    "totalFiles": 5,
-    "totalComponents": 10,
-    "readyComponents": 8,
-    "predictedBailoutComponents": 2,
-    "atRiskComponents": 0,
-    "optedOutComponents": 0,
-    "forcedOptInComponents": 0,
-    "totalViolations": 2,
-    "definiteLikelihood": 2,
-    "likelyLikelihood": 0,
-    "possibleLikelihood": 0
-  },
-  "components": [
-    {
-      "name": "MyComponent",
-      "kind": "component",
-      "filePath": "src/MyComponent.tsx",
-      "line": 14,
-      "status": "predicted-bailout",
-      "prediction": {
-        "outcome": "bailout",
-        "likelihood": "definite",
-        "reason": "A value is mutated inside the render body..."
-      },
-      "violations": [...]
-    }
-  ]
-}
+// 2. Compiler Compatibility Ground Truth Runner
+import { runCompilerCompatibility } from 'pure-react-check/compiler';
+const compatReport = await runCompilerCompatibility();
+console.log(`Agreement rate: ${compatReport.summary.agreementPercent.toFixed(1)}%`);
 ```
 
 ---
@@ -216,8 +172,11 @@ Output: `pure-react-bailout-report.json`
 # Typecheck
 pnpm typecheck
 
-# Run full test suite (including compiler-compat fixture suite)
+# Run full test suite (unit tests + compiler-compat fixture suite)
 pnpm test
+
+# Run compatibility fixture suite only
+pnpm test:compiler-compat
 
 # Build distribution
 pnpm build

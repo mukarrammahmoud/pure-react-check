@@ -12,8 +12,12 @@
  * const report = await analyseBailouts({ target: './src' });
  * console.log(`Readiness: ${report.stats.compilerReadinessPercent.toFixed(1)}%`);
  *
+ * // Compiler ground truth / compatibility suite
+ * import { runCompilerCompatibility } from 'pure-react-check/compiler';
+ * const compatReport = await runCompilerCompatibility();
+ *
  * IMPORTANT: pure-react-check is a static analysis preflight tool.
- * It does NOT run the React Compiler. Results are predictions only.
+ * It does NOT run the React Compiler in production scans.
  */
 
 // ─── Legacy scanner API ───────────────────────────────────────────────────────
@@ -43,9 +47,6 @@ export function getScore(result: import('./scanner.js').ScanResult): number {
 }
 
 // ─── Compiler Preflight API ───────────────────────────────────────────────────
-//
-// This layer provides component-level compiler-readiness predictions.
-// It does NOT replace the React Compiler.
 
 export {
   analyseBailouts,
@@ -82,3 +83,24 @@ export type { BailoutMapping } from './bailout/rule-map.js';
 export { generateBailoutJsonReport } from './reporters/bailout-json.js';
 export { printBailoutReport, printRegressionReport } from './reporters/bailout-terminal.js';
 export type { PrintBailoutOptions } from './reporters/bailout-terminal.js';
+
+// ─── Compiler Compatibility API ────────────────────────────────────────────────
+
+export {
+  runCompilerCompatibility,
+  createCompilerAdapter,
+  ReferenceCompilerAdapter,
+  ReactCompilerAdapter,
+  comparePredictionAndObservation,
+} from './compiler/index.js';
+export type {
+  CompilerAdapter,
+  CompilerOutcome,
+  CompilerDiagnostic,
+  CompilerObservation,
+  CompatibilityComparisonResult,
+  CompatibilityResult,
+  RuleMatrixEntry,
+  CompatibilityReport,
+  FixtureRunnerOptions,
+} from './compiler/index.js';

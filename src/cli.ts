@@ -23,6 +23,11 @@ import {
 } from './reporters/bailout-terminal.js';
 import { generateBailoutJsonReport } from './reporters/bailout-json.js';
 
+// Compiler compatibility layer
+import { runCompilerCompatibility } from './compiler/fixture-runner.js';
+import { printCompilerCompatReport } from './reporters/compiler-compat-terminal.js';
+import { generateCompilerCompatJsonReport } from './reporters/compiler-compat-json.js';
+
 // ─── Legacy scan CLI ─────────────────────────────────────────────────────────
 
 type OutputFormat = 'terminal' | 'html' | 'json' | 'sarif';
@@ -180,17 +185,11 @@ interface CompilerReportOptions {
   target: string;
   format: BailoutFormat;
   explain: boolean;
-  /** CI mode: fail when conditions are not met */
   ci: boolean;
-  /** CI: max allowed predicted-bailout components (default: no limit) */
   maxBailouts?: number;
-  /** CI: minimum required readiness percent (default: no limit) */
   minReadiness?: number;
-  /** CI: fail-on strategy */
   failOn?: 'any' | 'new';
-  /** Capture a baseline snapshot */
   baseline: boolean;
-  /** Compare against stored baseline */
   diff: boolean;
 }
 
@@ -241,15 +240,12 @@ async function runCompilerReportCli(args: string[]): Promise<number> {
 
   const report = await analyseBailouts({ target: opts.target });
 
-  // ── Baseline capture ───────────────────────────────────────────────────────
   if (opts.baseline) {
     const baselinePath = saveBaseline(report);
     console.log(`${pc.green('✓')} Baseline captured → ${pc.cyan(baselinePath)}`);
     console.log(pc.dim('Run with --diff to compare future scans against this baseline.\n'));
-    // Still print normal report after saving
   }
 
-  // ── Diff against baseline ──────────────────────────────────────────────────
   if (opts.diff) {
     const storedBaseline = loadBaseline();
     if (!storedBaseline) {
@@ -268,7 +264,6 @@ async function runCompilerReportCli(args: string[]): Promise<number> {
       printRegressionReport(diff);
     }
 
-    // In CI mode, fail on regressions
     if (opts.ci && diff.hasRegressions) {
       console.error(pc.red(`\n✗ CI failed: ${diff.regressions.length} regression(s) detected.\n`));
       return 1;
@@ -285,7 +280,6 @@ async function runCompilerReportCli(args: string[]): Promise<number> {
     return diff.hasRegressions ? 1 : 0;
   }
 
-  // ── Normal report output ───────────────────────────────────────────────────
   if (opts.format === 'json') {
     const reportPath = generateBailoutJsonReport(report);
     console.log(`Report written to ${pc.green(reportPath)}`);
@@ -293,7 +287,6 @@ async function runCompilerReportCli(args: string[]): Promise<number> {
     printBailoutReport(report, { explain: opts.explain });
   }
 
-  // ── CI enforcement ─────────────────────────────────────────────────────────
   if (opts.ci) {
     let ciFailed = false;
     const { stats } = report;
@@ -332,19 +325,92 @@ async function runCompilerReportCli(args: string[]): Promise<number> {
     return ciFailed ? 1 : 0;
   }
 
-  // Default exit: 1 if any predicted bailouts
   return report.stats.predictedBailoutComponents > 0 ? 1 : 0;
+}
+
+// ─── compiler-compat subcommand ───────────────────────────────────────────────
+
+interface CompilerCompatOptions {
+  fixturesDir?: string;
+  rule?: string;
+  fixture?: string;
+  format: 'terminal' | 'json';
+  ci: boolean;
+  minAgreement: number;
+}
+
+function parseCompilerCompatOptions(args: string[]): CompilerCompatOptions {
+  let fixturesDir: string | undefined;
+  let rule: string | undefined;
+  let fixture: string | undefined;
+  let format: 'terminal' | 'json' = 'terminal';
+  let ci = false;
+  let minAgreement = 80;
+
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === '--format' || arg.startsWith('--format=')) {
+      const val = arg.includes('=') ? arg.slice(arg.indexOf('=') + 1) : args[++i];
+      if (val === 'json') format = 'json';
+    } else if (arg === '--rule' || arg.startsWith('--rule=')) {
+      rule = arg.includes('=') ? arg.slice(arg.indexOf('=') + 1) : args[++i];
+    } else if (arg === '--fixture' || arg.startsWith('--fixture=')) {
+      fixture = arg.includes('=') ? arg.slice(arg.indexOf('=') + 1) : args[++i];
+    } else if (arg === '--ci') {
+      ci = true;
+    } else if (arg === '--min-agreement' || arg.startsWith('--min-agreement=')) {
+      const val = arg.includes('=') ? arg.slice(arg.indexOf('=') + 1) : args[++i];
+      minAgreement = Number(val);
+    } else if (!arg.startsWith('--')) {
+      fixturesDir = arg;
+    }
+  }
+
+  return { fixturesDir, rule, fixture, format, ci, minAgreement };
+}
+
+async function runCompilerCompatCli(args: string[]): Promise<number> {
+  const opts = parseCompilerCompatOptions(args);
+  const report = await runCompilerCompatibility({
+    fixturesDir: opts.fixturesDir,
+    ruleFilter: opts.rule,
+    fixtureFilter: opts.fixture,
+  });
+
+  if (opts.format === 'json') {
+    const reportPath = generateCompilerCompatJsonReport(report);
+    console.log(`Report written to ${pc.green(reportPath)}`);
+  } else {
+    printCompilerCompatReport(report);
+  }
+
+  if (opts.ci) {
+    if (report.summary.agreementPercent < opts.minAgreement) {
+      console.error(
+        pc.red(
+          `✗ CI failed: agreement rate ${report.summary.agreementPercent.toFixed(1)}% ` +
+          `is below min-agreement threshold of ${opts.minAgreement}%.`,
+        ),
+      );
+      return 1;
+    }
+    console.log(pc.green('✓ CI compiler compatibility check passed.\n'));
+  }
+
+  return 0;
 }
 
 // ─── Main CLI entry ───────────────────────────────────────────────────────────
 
 export async function runCli(args: string[] = process.argv.slice(2)): Promise<number> {
-  // Dispatch subcommands first
   if (args[0] === 'compiler-report') {
     return runCompilerReportCli(args.slice(1));
   }
 
-  // Legacy scanner mode (unchanged)
+  if (args[0] === 'compiler-compat') {
+    return runCompilerCompatCli(args.slice(1));
+  }
+
   const fileConfig = loadConfig();
 
   let options: CliOptions;
