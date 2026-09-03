@@ -74,6 +74,59 @@ npx pure-react-check compiler-report ./src --explain
 
 ---
 
+## CLI Reference
+
+### Global Options
+
+```bash
+npx pure-react-check --help        # Show full usage documentation
+npx pure-react-check --version     # Show version number
+```
+
+### `compiler-report` — Preflight Analysis
+
+```bash
+npx pure-react-check compiler-report [target] [options]
+```
+
+| Option | Description |
+|---|---|
+| `--explain` | Show detailed per-violation explanations |
+| `--format=terminal\|json` | Output format (default: `terminal`) |
+| `--ci` | Enable CI mode (exit 1 on failures) |
+| `--max-bailouts=<n>` | CI: max predicted-bailout components allowed |
+| `--min-readiness=<n>` | CI: minimum readiness percentage required |
+| `--fail-on=any\|new` | CI: fail on any bailout (`any`) or only new ones (`new`) |
+| `--baseline` | Capture a readiness baseline snapshot |
+| `--diff` | Compare current scan against saved baseline |
+
+### `compiler-compat` — Compatibility Suite
+
+```bash
+npx pure-react-check compiler-compat [dir] [options]
+```
+
+| Option | Description |
+|---|---|
+| `--format=terminal\|json` | Output format (default: `terminal`) |
+| `--rule=<ruleName>` | Filter verification to a single rule |
+| `--fixture=<substring>` | Filter verification to specific fixture path |
+| `--ci` | Run in strict CI mode |
+| `--min-agreement=<n>` | Minimum required agreement percentage (default: `80`) |
+
+### `scan` — Legacy File-Level Scan
+
+```bash
+npx pure-react-check scan [target] [options]
+```
+
+| Option | Description |
+|---|---|
+| `--format=terminal\|html\|json\|sarif` | Output format (default: `terminal`) |
+| `--threshold=<n>` | Minimum readiness threshold percentage |
+
+---
+
 ## Compiler Compatibility & Ground Truth Layer (`compiler-compat`)
 
 `pure-react-check` includes an automated **Compiler Compatibility Layer** to continuously compare static predictions against actual React Compiler behavior across versioned fixtures.
@@ -81,13 +134,6 @@ npx pure-react-check compiler-report ./src --explain
 ```bash
 npx pure-react-check compiler-compat
 ```
-
-### Compatibility CLI Options:
-- `--format=terminal|json`: Output format (default: `terminal`).
-- `--rule=<ruleName>`: Filter verification to a single static rule (e.g. `--rule=no-render-mutation`).
-- `--fixture=<substring>`: Filter verification to specific fixture path.
-- `--ci`: Run in strict CI mode; fails if agreement rate drops below threshold.
-- `--min-agreement=<percent>`: Minimum required agreement percentage (default: `80`).
 
 ### Terminal Compatibility Output:
 ```text
@@ -118,6 +164,40 @@ Agreement Rate:        89.1%
 
 ---
 
+## Configuration
+
+Create a `.purereactrc.json` or `purereact.config.json` in your project root:
+
+```json
+{
+  "target": "./src",
+  "format": "terminal",
+  "threshold": 80,
+  "ignore": ["**/test/**", "**/stories/**", "**/__mocks__/**"],
+  "rules": {
+    "no-nested-components": "warn",
+    "no-unstable-default-props": "off",
+    "no-ref-as-dependency": "error"
+  }
+}
+```
+
+### Config Fields
+
+| Field | Type | Description |
+|---|---|---|
+| `target` | `string` | Default scan target directory or glob |
+| `format` | `"terminal" \| "html" \| "json" \| "sarif"` | Default output format |
+| `threshold` | `number` | Minimum readiness score (0–100) |
+| `ignore` | `string[]` | Additional glob patterns to ignore (merged with defaults) |
+| `rules` | `Record<string, "error" \| "warn" \| "off">` | Per-rule severity overrides |
+
+**Default ignore patterns** (always applied): `**/node_modules/**`, `**/dist/**`, `**/build/**`
+
+Rules set to `"off"` are completely skipped during analysis. This applies to both the `compiler-report` and legacy `scan` commands.
+
+---
+
 ## CI/CD & Automation
 
 Enforce compiler readiness thresholds in your CI pipelines:
@@ -125,6 +205,16 @@ Enforce compiler readiness thresholds in your CI pipelines:
 ### Preflight Readiness Check
 ```bash
 npx pure-react-check compiler-report ./src --ci --max-bailouts=0 --min-readiness=95
+```
+
+### Fail on Any Bailout
+```bash
+npx pure-react-check compiler-report ./src --ci --fail-on=any
+```
+
+### Fail Only on New Bailouts (with baseline diff)
+```bash
+npx pure-react-check compiler-report ./src --diff --ci --fail-on=new
 ```
 
 ### Compiler Compatibility Verification Check
@@ -155,13 +245,25 @@ Import the preflight analyzer or compatibility suite directly:
 ```ts
 // 1. Static Compiler Preflight Analysis
 import { analyseBailouts } from 'pure-react-check/api';
-const report = await analyseBailouts({ target: './src' });
+const report = await analyseBailouts({
+  target: './src',
+  ignore: ['**/test/**'],
+  rules: { 'no-nested-components': 'off' },
+});
 console.log(`Readiness: ${report.stats.compilerReadinessPercent.toFixed(1)}%`);
 
 // 2. Compiler Compatibility Ground Truth Runner
 import { runCompilerCompatibility } from 'pure-react-check/compiler';
 const compatReport = await runCompilerCompatibility();
 console.log(`Agreement rate: ${compatReport.summary.agreementPercent.toFixed(1)}%`);
+
+// 3. Direct Scanner with Custom Options
+import { scanDirectory } from 'pure-react-check/api';
+const result = await scanDirectory('./src', {
+  ignore: ['**/stories/**'],
+  rules: { 'no-unstable-default-props': 'off' },
+});
+console.log(`Files: ${result.files.length}, Violations: ${result.violations.length}`);
 ```
 
 ---

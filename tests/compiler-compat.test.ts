@@ -24,8 +24,9 @@ describe('Compiler Compatibility Suite', () => {
     test('ReferenceCompilerAdapter evaluates code with observationSource = reference-model', async () => {
       const adapter = new ReferenceCompilerAdapter();
       const code = `
+        let counter = 0;
         export function CleanComp() { return <div>clean</div>; }
-        export function BrokenComp() { let a = 0; a = a + 1; return <div>{a}</div>; }
+        export function BrokenComp() { counter++; return <div>{counter}</div>; }
       `;
       const obs = await adapter.analyse(code);
       assert.equal(obs.length, 2);

@@ -1,9 +1,12 @@
 import pc from 'picocolors';
+import fs from 'node:fs';
+import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { createInterface } from 'node:readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
 import { scanDirectory } from './scanner.js';
+import type { ScanOptions } from './scanner.js';
 import { generateHtmlReport } from './reporters/html.js';
 import { generateJsonReport } from './reporters/json.js';
 import { generateSarifReport } from './reporters/sarif.js';
@@ -28,6 +31,84 @@ import { runCompilerCompatibility } from './compiler/fixture-runner.js';
 import { printCompilerCompatReport } from './reporters/compiler-compat-terminal.js';
 import { generateCompilerCompatJsonReport } from './reporters/compiler-compat-json.js';
 
+// ─── Version ──────────────────────────────────────────────────────────────────
+
+function getVersion(): string {
+  try {
+    const pkgPath = path.resolve(
+      path.dirname(new URL(import.meta.url).pathname),
+      '../package.json',
+    );
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
+    return pkg.version ?? '0.0.0';
+  } catch {
+    return '0.0.0';
+  }
+}
+
+// ─── Help text ────────────────────────────────────────────────────────────────
+
+function printHelp(): void {
+  const version = getVersion();
+  console.log(`
+${pc.bold('pure-react-check')} ${pc.dim(`v${version}`)}
+${pc.dim('React Compiler Preflight Analyzer')}
+
+${pc.bold('USAGE')}
+  npx pure-react-check [command] [target] [options]
+
+${pc.bold('COMMANDS')}
+  ${pc.cyan('compiler-report')} [target]   Run compiler preflight analysis ${pc.dim('(recommended)')}
+  ${pc.cyan('compiler-compat')} [dir]      Run compiler compatibility suite
+  ${pc.cyan('scan')} [target]              Legacy file-level scan
+
+  If no command is given, runs the legacy scan interactively.
+
+${pc.bold('COMPILER-REPORT OPTIONS')}
+  --explain                    Show detailed per-violation explanations
+  --format=terminal|json       Output format (default: terminal)
+  --ci                         Enable CI mode (exit 1 on failures)
+  --max-bailouts=<n>           CI: max predicted-bailout components
+  --min-readiness=<n>          CI: minimum readiness percentage
+  --fail-on=any|new            CI: fail on any bailout or only new ones
+  --baseline                   Capture a readiness baseline snapshot
+  --diff                       Compare against saved baseline
+
+${pc.bold('COMPILER-COMPAT OPTIONS')}
+  --format=terminal|json       Output format (default: terminal)
+  --rule=<ruleName>            Filter to a single rule
+  --fixture=<substring>        Filter to specific fixture path
+  --ci                         Enable CI mode
+  --min-agreement=<n>          Minimum agreement percentage (default: 80)
+
+${pc.bold('LEGACY SCAN OPTIONS')}
+  --format=terminal|html|json|sarif  Output format (default: terminal)
+  --threshold=<n>              Minimum readiness threshold percentage
+
+${pc.bold('GLOBAL OPTIONS')}
+  --help, -h                   Show this help message
+  --version, -v                Show version number
+
+${pc.bold('CONFIG FILE')}
+  Create ${pc.cyan('.purereactrc.json')} or ${pc.cyan('purereact.config.json')} in your project root:
+  ${pc.dim('{')}
+  ${pc.dim('  "target": "./src",')}
+  ${pc.dim('  "format": "terminal",')}
+  ${pc.dim('  "ignore": ["**/test/**", "**/stories/**"],')}
+  ${pc.dim('  "rules": { "no-nested-components": "warn", "no-unstable-default-props": "off" }')}
+  ${pc.dim('}')}
+
+${pc.bold('EXAMPLES')}
+  ${pc.dim('$')} npx pure-react-check compiler-report ./src
+  ${pc.dim('$')} npx pure-react-check compiler-report ./src --explain
+  ${pc.dim('$')} npx pure-react-check compiler-report ./src --ci --max-bailouts=0
+  ${pc.dim('$')} npx pure-react-check compiler-report ./src --baseline
+  ${pc.dim('$')} npx pure-react-check compiler-report ./src --diff --ci
+  ${pc.dim('$')} npx pure-react-check compiler-compat --ci --min-agreement=85
+  ${pc.dim('$')} npx pure-react-check scan ./src --format=sarif
+`);
+}
+
 // ─── Legacy scan CLI ─────────────────────────────────────────────────────────
 
 type OutputFormat = 'terminal' | 'html' | 'json' | 'sarif';
@@ -36,6 +117,7 @@ interface CliOptions {
   target: string;
   threshold?: number;
   format: OutputFormat;
+  scanOptions?: ScanOptions;
 }
 
 async function promptForOptions(): Promise<CliOptions> {
@@ -175,6 +257,8 @@ function printTerminal(
   console.log(`Scanned Files: ${result.files.length}`);
   console.log(`Total Violations: ${result.violations.length}`);
   console.log(`Total Errors: ${result.errors.length}\n`);
+
+  console.log(pc.dim('Tip: Run "npx pure-react-check compiler-report ./src" for the full preflight analysis.\n'));
 }
 
 // ─── compiler-report subcommand ───────────────────────────────────────────────
@@ -236,9 +320,16 @@ function parseCompilerReportOptions(args: string[]): CompilerReportOptions {
 async function runCompilerReportCli(args: string[]): Promise<number> {
   const opts = parseCompilerReportOptions(args);
 
+  // Load project config for ignore/rules
+  const fileConfig = loadConfig();
+
   console.log(pc.dim(`\nAnalysing ${pc.white(opts.target)} …\n`));
 
-  const report = await analyseBailouts({ target: opts.target });
+  const report = await analyseBailouts({
+    target: opts.target,
+    ignore: fileConfig?.ignore,
+    rules: fileConfig?.rules,
+  });
 
   if (opts.baseline) {
     const baselinePath = saveBaseline(report);
@@ -403,6 +494,17 @@ async function runCompilerCompatCli(args: string[]): Promise<number> {
 // ─── Main CLI entry ───────────────────────────────────────────────────────────
 
 export async function runCli(args: string[] = process.argv.slice(2)): Promise<number> {
+  // Global flags: --help / --version
+  if (args.includes('--help') || args.includes('-h')) {
+    printHelp();
+    return 0;
+  }
+
+  if (args.includes('--version') || args.includes('-v')) {
+    console.log(getVersion());
+    return 0;
+  }
+
   if (args[0] === 'compiler-report') {
     return runCompilerReportCli(args.slice(1));
   }
@@ -411,14 +513,16 @@ export async function runCli(args: string[] = process.argv.slice(2)): Promise<nu
     return runCompilerCompatCli(args.slice(1));
   }
 
+  // Legacy scan path (also accessible via explicit "scan" command)
+  const scanArgs = args[0] === 'scan' ? args.slice(1) : args;
   const fileConfig = loadConfig();
 
   let options: CliOptions;
 
-  if (args.length === 0 && input.isTTY && output.isTTY && !fileConfig) {
+  if (scanArgs.length === 0 && input.isTTY && output.isTTY && !fileConfig) {
     options = await promptForOptions();
   } else {
-    const cliFlags = parseOptions(args);
+    const cliFlags = parseOptions(scanArgs);
     options = {
       target: cliFlags.target ?? fileConfig?.target ?? './',
       format: cliFlags.format ?? fileConfig?.format ?? 'terminal',
@@ -426,11 +530,17 @@ export async function runCli(args: string[] = process.argv.slice(2)): Promise<nu
     };
   }
 
+  // Build scan options from config
+  const scanOptions: ScanOptions | undefined =
+    (fileConfig?.ignore || fileConfig?.rules)
+      ? { ignore: fileConfig.ignore, rules: fileConfig.rules }
+      : undefined;
+
   if (fileConfig) {
     console.log(pc.dim(`Config loaded from project root.\n`));
   }
 
-  const result = await scanDirectory(options.target);
+  const result = await scanDirectory(options.target, scanOptions);
   const score = getScore(result.files, result.violations);
 
   switch (options.format) {

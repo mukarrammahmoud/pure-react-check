@@ -4,7 +4,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { scanDirectory, type ScanResult } from '../scanner.js';
+import { scanDirectory, type ScanResult, type ScanOptions, type RuleSeverity } from '../scanner.js';
 import type { Violation } from '../rules/types.js';
 import { getBailoutMapping } from './rule-map.js';
 import { buildDirectiveVisitors } from './directive-scanner.js';
@@ -223,12 +223,17 @@ async function runExtraPass(
 
 // ─── File resolution ──────────────────────────────────────────────────────────
 
-async function resolveAbsoluteFiles(target: string): Promise<string[]> {
+const DEFAULT_IGNORE = ['**/node_modules/**', '**/dist/**', '**/build/**'];
+
+async function resolveAbsoluteFiles(target: string, extraIgnore?: string[]): Promise<string[]> {
   const fastGlobModule = await import('fast-glob');
   const fastGlob = fastGlobModule.default;
 
   const absoluteTarget = path.resolve(target);
   const targetStats = fs.existsSync(absoluteTarget) ? fs.statSync(absoluteTarget) : null;
+  const ignorePatterns = extraIgnore && extraIgnore.length > 0
+    ? [...DEFAULT_IGNORE, ...extraIgnore]
+    : DEFAULT_IGNORE;
 
   let absoluteFiles: string[];
   if (targetStats?.isFile()) {
@@ -237,12 +242,12 @@ async function resolveAbsoluteFiles(target: string): Promise<string[]> {
     absoluteFiles = await fastGlob('**/*.{js,jsx,ts,tsx}', {
       cwd: absoluteTarget,
       absolute: true,
-      ignore: ['**/node_modules/**', '**/dist/**', '**/build/**'],
+      ignore: ignorePatterns,
     });
   } else {
     absoluteFiles = await fastGlob(target, {
       absolute: true,
-      ignore: ['**/node_modules/**', '**/dist/**', '**/build/**'],
+      ignore: ignorePatterns,
     });
   }
 
@@ -254,6 +259,10 @@ async function resolveAbsoluteFiles(target: string): Promise<string[]> {
 export interface BailoutAnalysisOptions {
   /** Directory, file, or glob to scan */
   target: string;
+  /** Additional glob patterns to ignore (merged with defaults) */
+  ignore?: string[];
+  /** Per-rule severity overrides. Rules set to 'off' are skipped entirely. */
+  rules?: Record<string, RuleSeverity>;
 }
 
 // ─── Main analyser ────────────────────────────────────────────────────────────
@@ -261,9 +270,14 @@ export interface BailoutAnalysisOptions {
 export async function analyseBailouts(
   options: BailoutAnalysisOptions,
 ): Promise<BailoutReport> {
-  const scanResult: ScanResult = await scanDirectory(options.target);
+  const scanOpts: ScanOptions | undefined =
+    (options.ignore || options.rules)
+      ? { ignore: options.ignore, rules: options.rules }
+      : undefined;
 
-  const absoluteFiles = await resolveAbsoluteFiles(options.target);
+  const scanResult: ScanResult = await scanDirectory(options.target, scanOpts);
+
+  const absoluteFiles = await resolveAbsoluteFiles(options.target, options.ignore);
   const relativeFiles = absoluteFiles.map((f) =>
     path.relative(process.cwd(), f).replaceAll('\\', '/'),
   );
