@@ -2,6 +2,19 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { ScanResult } from '../scanner.js';
 
+function getToolVersion(): string {
+  try {
+    const pkgPath = path.resolve(
+      path.dirname(new URL(import.meta.url).pathname),
+      '../../package.json',
+    );
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
+    return pkg.version ?? '0.0.0';
+  } catch {
+    return '0.0.0';
+  }
+}
+
 // SARIF 2.1.0 — https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html
 interface SarifLog {
   $schema: string;
@@ -133,7 +146,7 @@ export function generateSarifReport(
         tool: {
           driver: {
             name: 'pure-react-check',
-            version: '1.0.1',
+            version: getToolVersion(),
             informationUri: 'https://www.npmjs.com/package/pure-react-check',
             rules: allRuleIds.map(toSarifRule),
           },

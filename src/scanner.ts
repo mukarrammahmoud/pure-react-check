@@ -12,8 +12,17 @@ export interface ScanResult {
   errors: ScanError[];
 }
 
+export type RuleSeverity = 'error' | 'warn' | 'off';
+
+export interface ScanOptions {
+  /** Additional glob patterns to ignore (merged with defaults) */
+  ignore?: string[];
+  /** Per-rule severity overrides. Rules set to 'off' are skipped entirely. */
+  rules?: Record<string, RuleSeverity>;
+}
+
 const SOURCE_PATTERN = '**/*.{js,jsx,ts,tsx}';
-const rules: AnalysisRule[] = allRules;
+const DEFAULT_IGNORE = ['**/node_modules/**', '**/dist/**', '**/build/**'];
 
 function normalizePath(filePath: string): string {
   return filePath.replaceAll('\\', '/');
@@ -23,7 +32,27 @@ function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-export async function scanDirectory(targetDir: string): Promise<ScanResult> {
+function resolveActiveRules(options?: ScanOptions): AnalysisRule[] {
+  if (!options?.rules) return allRules;
+
+  return allRules.filter((rule) => {
+    const severity = options.rules![rule.name];
+    // If no override is provided, the rule runs by default
+    if (severity === undefined) return true;
+    // If explicitly disabled, skip the rule
+    return severity !== 'off';
+  });
+}
+
+function resolveIgnorePatterns(options?: ScanOptions): string[] {
+  if (!options?.ignore || options.ignore.length === 0) return DEFAULT_IGNORE;
+  return [...DEFAULT_IGNORE, ...options.ignore];
+}
+
+export async function scanDirectory(
+  targetDir: string,
+  options?: ScanOptions,
+): Promise<ScanResult> {
   const fs = await import('node:fs');
   const path = await import('node:path');
   const parser = await import('@babel/parser');
@@ -35,6 +64,9 @@ export async function scanDirectory(targetDir: string): Promise<ScanResult> {
   const absoluteTarget = path.resolve(targetDir);
   const targetStats = fs.existsSync(absoluteTarget) ? fs.statSync(absoluteTarget) : null;
 
+  const ignorePatterns = resolveIgnorePatterns(options);
+  const rules = resolveActiveRules(options);
+
   let absoluteFiles: string[];
   if (targetStats?.isFile()) {
     absoluteFiles = [absoluteTarget];
@@ -42,14 +74,14 @@ export async function scanDirectory(targetDir: string): Promise<ScanResult> {
     absoluteFiles = await fastGlob(SOURCE_PATTERN, {
       absolute: true,
       cwd: absoluteTarget,
-      ignore: ['**/node_modules/**'],
+      ignore: ignorePatterns,
       onlyFiles: true,
     });
   } else {
     absoluteFiles = await fastGlob(targetDir, {
       absolute: true,
       cwd: process.cwd(),
-      ignore: ['**/node_modules/**'],
+      ignore: ignorePatterns,
       onlyFiles: true,
     });
   }

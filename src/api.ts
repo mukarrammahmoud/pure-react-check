@@ -1,9 +1,16 @@
 /**
- * pure-react-check — Programmatic Node.js API (v1.2.0)
+ * pure-react-check — Programmatic Node.js API
  *
  * Public surface area for integration with build tools, CI/CD scripts,
  * custom reporting pipelines, and compiler compatibility suites.
  */
+
+// ── Scanner & Config ──
+export { scanDirectory } from './scanner.js';
+export type { ScanOptions, RuleSeverity, ScanResult } from './scanner.js';
+
+export { loadConfig } from './config.js';
+export type { PureReactCheckConfig } from './config.js';
 
 // ── Bailout Engine ──
 export {

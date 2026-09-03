@@ -60,6 +60,18 @@ export class ReferenceCompilerAdapter implements CompilerAdapter {
 
       const isModuleOptedOut = source.includes('"use no memo"') || source.includes("'use no memo'");
 
+      // Collect module-level let/var bindings (candidates for global mutation)
+      const moduleLevelBindings = new Set<string>();
+      for (const stmt of ast.program.body) {
+        if (stmt.type === 'VariableDeclaration' && (stmt.kind === 'let' || stmt.kind === 'var')) {
+          for (const decl of stmt.declarations) {
+            if (decl.id.type === 'Identifier') {
+              moduleLevelBindings.add(decl.id.name);
+            }
+          }
+        }
+      }
+
       traverse(ast, {
         Function(path: NodePath<t.Function>) {
           let name: string | null = null;
@@ -100,6 +112,16 @@ export class ReferenceCompilerAdapter implements CompilerAdapter {
             bailedOut = true;
             bailoutReason = 'Async component functions are not supported by the compiler.';
           }
+
+          // Collect locally declared variables within this component
+          const localBindings = new Set<string>();
+          path.traverse({
+            VariableDeclarator(declPath: NodePath<t.VariableDeclarator>) {
+              if (declPath.node.id.type === 'Identifier') {
+                localBindings.add(declPath.node.id.name);
+              }
+            },
+          });
 
           // Inner AST inspections according to React Compiler specification
           path.traverse({
@@ -151,14 +173,19 @@ export class ReferenceCompilerAdapter implements CompilerAdapter {
                 bailoutReason = `Impure call '${callee.object.name}.${callee.property.type === 'Identifier' ? callee.property.name : 'fn'}' during render.`;
               }
 
-              // 4. Prop/State array mutation methods (.push, .splice)
+              // 4. Prop/State array mutation methods (.push, .splice) — but not on locally created arrays
               if (
                 callee.type === 'MemberExpression' &&
                 callee.property.type === 'Identifier' &&
                 MUTATING_METHODS.has(callee.property.name)
               ) {
-                bailedOut = true;
-                bailoutReason = `Mutating method '${callee.property.name}' called during render.`;
+                // Check if the object being mutated is a local binding
+                const objectName = callee.object.type === 'Identifier' ? callee.object.name : null;
+                const isLocalMutation = objectName && localBindings.has(objectName);
+                if (!isLocalMutation) {
+                  bailedOut = true;
+                  bailoutReason = `Mutating method '${callee.property.name}' called during render.`;
+                }
               }
             },
 
@@ -197,11 +224,36 @@ export class ReferenceCompilerAdapter implements CompilerAdapter {
 
               const left = assignPath.node.left;
               if (left.type === 'Identifier') {
-                bailedOut = true;
-                bailoutReason = `Render-phase mutation of local variable '${left.name}'.`;
+                // Only flag mutation of non-local variables (module-level globals)
+                if (moduleLevelBindings.has(left.name)) {
+                  bailedOut = true;
+                  bailoutReason = `Render-phase mutation of module-level variable '${left.name}'.`;
+                }
+                // Reassignment of local variables is safe and expected
               } else if (left.type === 'MemberExpression') {
+                // Property mutation — check if the root object is local
+                let rootObj: t.Expression | t.Super = left.object;
+                while (rootObj.type === 'MemberExpression') {
+                  rootObj = rootObj.object;
+                }
+                const rootName = rootObj.type === 'Identifier' ? rootObj.name : null;
+                const isLocalPropMutation = rootName && localBindings.has(rootName);
+
+                if (!isLocalPropMutation) {
+                  bailedOut = true;
+                  bailoutReason = 'Render-phase mutation of property/object.';
+                }
+              }
+            },
+
+            UpdateExpression(updatePath: NodePath<t.UpdateExpression>) {
+              const funcParent = updatePath.getFunctionParent();
+              if (funcParent !== path) return;
+
+              const arg = updatePath.node.argument;
+              if (arg.type === 'Identifier' && moduleLevelBindings.has(arg.name)) {
                 bailedOut = true;
-                bailoutReason = 'Render-phase mutation of property/object.';
+                bailoutReason = `Render-phase mutation of module-level variable '${arg.name}'.`;
               }
             },
           });
@@ -258,7 +310,43 @@ export class ReactCompilerAdapter implements CompilerAdapter {
       const compiledCode = result?.code ?? '';
       const observations: CompilerObservation[] = [];
 
+      // Parse original source to identify components/hooks
       const ast = parse(source, { sourceType: 'unambiguous', plugins: ['jsx', 'typescript'] });
+
+      // Parse compiled output to check per-component memoization
+      let compiledAst: ReturnType<typeof parse> | null = null;
+      try {
+        compiledAst = parse(compiledCode, {
+          sourceType: 'unambiguous',
+          plugins: ['jsx'],
+        });
+      } catch {
+        // If we can't parse compiled output, fall back to string matching
+      }
+
+      // Collect compiled function names that contain memoization markers
+      const memoizedFunctions = new Set<string>();
+      if (compiledAst) {
+        traverse(compiledAst, {
+          Function(cPath: NodePath<t.Function>) {
+            let fnName: string | null = null;
+            if ('id' in cPath.node && cPath.node.id && 'name' in cPath.node.id) {
+              fnName = cPath.node.id.name;
+            } else if (cPath.parentPath?.isVariableDeclarator()) {
+              const id = cPath.parentPath.node.id;
+              if (id.type === 'Identifier') fnName = id.name;
+            }
+            if (!fnName) return;
+
+            // Check this specific function body for memoization markers
+            const fnCode = compiledCode.slice(cPath.node.start ?? 0, cPath.node.end ?? 0);
+            if (fnCode.includes('_c(') || fnCode.includes('useMemoCache')) {
+              memoizedFunctions.add(fnName);
+            }
+          },
+        });
+      }
+
       traverse(ast, {
         Function(path: NodePath<t.Function>) {
           let name: string | null = null;
@@ -269,10 +357,14 @@ export class ReactCompilerAdapter implements CompilerAdapter {
 
           if (!name || (!/^[A-Z]/.test(name) && !/^use[A-Z]/.test(name))) return;
 
-          const isMemoizedInOutput = compiledCode.includes(`_c(`) || compiledCode.includes(`useMemoCache`);
+          // Per-component optimization check
+          const isMemoized = compiledAst
+            ? memoizedFunctions.has(name)
+            : (compiledCode.includes(`_c(`) || compiledCode.includes(`useMemoCache`));
+
           observations.push({
             componentName: name,
-            outcome: isMemoizedInOutput ? 'optimized' : 'bailed-out',
+            outcome: isMemoized ? 'optimized' : 'bailed-out',
             observationSource: 'react-compiler',
             compilerVersion: this.version,
           });
