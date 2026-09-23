@@ -1,0 +1,6 @@
+{
+  "id": "conditional-hook",
+  "category": "hooks",
+  "description": "Invoking a React hook inside a conditional branch",
+  "entry": "input.tsx"
+}

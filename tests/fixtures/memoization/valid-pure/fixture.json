@@ -1,0 +1,6 @@
+{
+  "id": "valid-pure",
+  "category": "memoization",
+  "description": "Clean pure component suitable for automatic memoization",
+  "entry": "input.tsx"
+}

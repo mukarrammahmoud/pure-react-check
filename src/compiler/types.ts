@@ -5,7 +5,7 @@
  * against observed or reference behavior of the React Compiler.
  */
 
-import type { CompilerPrediction, RuleImpact } from '../bailout/types.js';
+import type { CompilerPrediction, RuleImpact, AnnotatedViolation } from '../bailout/types.js';
 
 /**
  * Indicates whether the observation was produced by the real React Compiler
@@ -22,20 +22,38 @@ export type CompilerOutcome =
   | 'skipped'     // Component was explicitly skipped via directive ("use no memo")
   | 'unknown';    // Compiler outcome could not be determined with certainty
 
+export type ExecutionStatus = 'success' | 'error' | 'timeout';
+
 export interface CompilerDiagnostic {
   line?: number;
   message: string;
   severity?: 'error' | 'warning' | 'info';
 }
 
-export interface CompilerObservation {
+export interface ComponentObservation {
   componentName: string;
+  outcome: CompilerOutcome;
+  observationSource: ObservationSource;
+  reason?: string;
+  diagnostics?: CompilerDiagnostic[];
+  compilerVersion?: string;
+}
+
+export interface CompilerObservation {
+  componentName?: string;
   outcome: CompilerOutcome;
   /** Explicit source of observation (never call reference model ground truth) */
   observationSource: ObservationSource;
   reason?: string;
   diagnostics?: CompilerDiagnostic[];
   compilerVersion?: string;
+
+  /** Fixture-level execution tracking for Ground Truth runner */
+  fixtureId?: string;
+  executionStatus?: ExecutionStatus;
+  components?: ComponentObservation[];
+  durationMs?: number;
+  metadata?: Record<string, unknown>;
 }
 
 export type CompatibilityClassification =
@@ -111,4 +129,84 @@ export interface CompatibilityReport {
   ruleReliability: Record<string, RuleReliability>;
   results: CompatibilityResult[];
   mismatches: CompatibilityResult[];
+}
+
+// ─── Ground Truth Fixture Domain & Runner Types ───────────────────────────────
+
+export type FixtureCategory =
+  | 'purity'
+  | 'hooks'
+  | 'memoization'
+  | 'directives'
+  | 'edge-cases';
+
+export interface CompilerFixture {
+  id: string;
+  category: FixtureCategory;
+  description: string;
+  entry: string;
+  tags?: string[];
+}
+
+export interface ComponentPrediction {
+  name: string;
+  outcome: CompilerOutcome;
+  rules: string[];
+  reason?: string;
+  rawPrediction?: 'ready' | 'bailout' | 'at-risk' | 'opted-out' | 'forced-opt-in';
+}
+
+export interface StaticPrediction {
+  fixtureId: string;
+  outcome: CompilerOutcome;
+  violations: AnnotatedViolation[];
+  components: ComponentPrediction[];
+  analyzerVersion: string;
+  durationMs: number;
+}
+
+export type GroundTruthClassification =
+  | 'agreement'
+  | 'false-positive'
+  | 'false-negative'
+  | 'unknown';
+
+export interface ComponentCompatibilityComparison {
+  componentName: string;
+  predictedOutcome: CompilerOutcome;
+  actualOutcome: CompilerOutcome;
+  classification: GroundTruthClassification;
+  reason?: string;
+}
+
+export interface CompatibilityComparison {
+  classification: GroundTruthClassification;
+  details?: string;
+  components?: ComponentCompatibilityComparison[];
+}
+
+export interface FixtureRunResult {
+  fixture: CompilerFixture;
+  prediction: StaticPrediction;
+  observation: CompilerObservation;
+  compatibility: CompatibilityComparison;
+}
+
+export interface GroundTruthSummary {
+  total: number;
+  agreement: number;
+  falsePositives: number;
+  falseNegatives: number;
+  unknown: number;
+  agreementRate: number;
+}
+
+export interface GroundTruthSuiteResult {
+  schemaVersion: number;
+  analyzerVersion: string;
+  compilerName: string;
+  compilerVersion: string;
+  timestamp?: string;
+  summary: GroundTruthSummary;
+  fixtures: FixtureRunResult[];
 }

@@ -5,9 +5,14 @@
 import type { CompilerPrediction } from '../bailout/types.js';
 import type {
   CompilerObservation,
+  CompilerOutcome,
   CompatibilityResult,
   CompatibilityClassification,
   MismatchKind,
+  StaticPrediction,
+  CompatibilityComparison,
+  ComponentCompatibilityComparison,
+  GroundTruthClassification,
 } from './types.js';
 
 export function comparePredictionAndObservation(
@@ -96,3 +101,98 @@ export function comparePredictionAndObservation(
     notes,
   };
 }
+
+// ─── Ground Truth Comparator ──────────────────────────────────────────────────
+
+/**
+ * Classifies a single (predicted, actual) outcome pair according to Ground Truth semantics.
+ * Ensures compiler execution errors are never classified as false-positive or false-negative.
+ */
+export function classifyOutcomePair(
+  predicted: CompilerOutcome,
+  actual: CompilerOutcome,
+  executionStatus?: string,
+): { classification: GroundTruthClassification; details: string } {
+  if (executionStatus === 'error' || executionStatus === 'timeout') {
+    return {
+      classification: 'unknown',
+      details: `Compiler execution ${executionStatus}: outcome could not be determined reliably.`,
+    };
+  }
+
+  if (predicted === 'unknown' || actual === 'unknown') {
+    return {
+      classification: 'unknown',
+      details: 'Outcome could not be determined with certainty.',
+    };
+  }
+
+  if (predicted === actual) {
+    return {
+      classification: 'agreement',
+      details: `Both predicted and observed outcome agree on "${actual}".`,
+    };
+  }
+
+  if (predicted === 'bailed-out' && actual === 'optimized') {
+    return {
+      classification: 'false-positive',
+      details: 'False Positive: static analysis predicted bailout, but compiler successfully optimized.',
+    };
+  }
+
+  if (predicted === 'optimized' && actual === 'bailed-out') {
+    return {
+      classification: 'false-negative',
+      details: 'False Negative: static analysis predicted optimization, but compiler bailed out.',
+    };
+  }
+
+  return {
+    classification: 'unknown',
+    details: `Unmatched outcome pair: predicted "${predicted}" vs actual "${actual}".`,
+  };
+}
+
+/**
+ * Compares static prediction against compiler observation for a fixture.
+ * Pure, side-effect free, and deterministic.
+ */
+export function compareGroundTruth(
+  prediction: StaticPrediction,
+  observation: CompilerObservation,
+): CompatibilityComparison {
+  const fixturePair = classifyOutcomePair(
+    prediction.outcome,
+    observation.outcome,
+    observation.executionStatus,
+  );
+
+  const componentComparisons: ComponentCompatibilityComparison[] = [];
+  const obsComponents = observation.components ?? [];
+
+  for (const predComp of prediction.components) {
+    const matchingObs = obsComponents.find((c) => c.componentName === predComp.name);
+    const actualOutcome = matchingObs ? matchingObs.outcome : 'unknown';
+    const pair = classifyOutcomePair(
+      predComp.outcome,
+      actualOutcome,
+      observation.executionStatus,
+    );
+
+    componentComparisons.push({
+      componentName: predComp.name,
+      predictedOutcome: predComp.outcome,
+      actualOutcome,
+      classification: pair.classification,
+      reason: predComp.reason ?? matchingObs?.reason,
+    });
+  }
+
+  return {
+    classification: fixturePair.classification,
+    details: fixturePair.details,
+    components: componentComparisons,
+  };
+}
+

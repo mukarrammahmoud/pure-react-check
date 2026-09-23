@@ -6,20 +6,34 @@
  * Otherwise, it uses a reference adapter based on React Compiler documented behavior.
  */
 
+import { performance } from 'node:perf_hooks';
 import { parse } from '@babel/parser';
 import _traverse from '@babel/traverse';
 import type { NodePath } from '@babel/traverse' with { 'resolution-mode': 'import' };
 import type * as t from '@babel/types' with { 'resolution-mode': 'import' };
-import type { CompilerObservation } from './types.js';
+import type {
+  CompilerObservation,
+  CompilerOutcome,
+  ComponentObservation,
+  ExecutionStatus,
+} from './types.js';
 import { isLazyRefInit } from '../rules/utils.js';
 
 // Workaround ESM/CJS interop for traverse
 const traverse = (typeof _traverse === 'function' ? _traverse : (_traverse as { default: typeof _traverse }).default);
 
+export interface CompilerCompileRequest {
+  fixtureId: string;
+  source: string;
+  filePath?: string;
+  options?: Record<string, unknown>;
+}
+
 export interface CompilerAdapter {
-  name: string;
-  version: string;
-  isRealCompiler: boolean;
+  readonly name: string;
+  readonly version: string;
+  readonly isRealCompiler: boolean;
+  compile(request: CompilerCompileRequest): Promise<CompilerObservation>;
   analyse(source: string, filePath?: string): Promise<CompilerObservation[]>;
 }
 
@@ -45,9 +59,63 @@ const MUTATING_METHODS = new Set(['push', 'pop', 'splice', 'sort', 'reverse', 's
  * They must NOT be represented as official React Compiler ground truth.
  */
 export class ReferenceCompilerAdapter implements CompilerAdapter {
-  name = 'Reference Compiler Model';
-  version = '19.0.0-reference';
-  isRealCompiler = false;
+  readonly name = 'Reference Compiler Model';
+  readonly version = '19.0.0-reference';
+  readonly isRealCompiler = false;
+
+  async compile(request: CompilerCompileRequest): Promise<CompilerObservation> {
+    const startTime = performance.now();
+    try {
+      const components = await this.analyse(request.source, request.filePath ?? 'inline.tsx');
+      const durationMs = Math.round(performance.now() - startTime);
+
+      let outcome: CompilerOutcome = 'unknown';
+      if (components.length > 0) {
+        if (components.some((c) => c.outcome === 'bailed-out')) {
+          outcome = 'bailed-out';
+        } else if (components.some((c) => c.outcome === 'skipped')) {
+          outcome = 'skipped';
+        } else if (components.every((c) => c.outcome === 'optimized')) {
+          outcome = 'optimized';
+        }
+      }
+
+      return {
+        fixtureId: request.fixtureId,
+        compilerVersion: this.version,
+        outcome,
+        executionStatus: 'success',
+        observationSource: 'reference-model',
+        diagnostics: [],
+        components: components.map((c) => ({
+          componentName: c.componentName ?? 'Anonymous',
+          outcome: c.outcome,
+          observationSource: 'reference-model',
+          reason: c.reason,
+          diagnostics: c.diagnostics,
+          compilerVersion: this.version,
+        })),
+        durationMs,
+      };
+    } catch (err) {
+      const durationMs = Math.round(performance.now() - startTime);
+      return {
+        fixtureId: request.fixtureId,
+        compilerVersion: this.version,
+        outcome: 'unknown',
+        executionStatus: 'error',
+        observationSource: 'reference-model',
+        diagnostics: [
+          {
+            message: err instanceof Error ? err.message : String(err),
+            severity: 'error',
+          },
+        ],
+        components: [],
+        durationMs,
+      };
+    }
+  }
 
   async analyse(source: string, _filePath = 'inline.tsx'): Promise<CompilerObservation[]> {
     const observations: CompilerObservation[] = [];
@@ -288,94 +356,230 @@ export class ReferenceCompilerAdapter implements CompilerAdapter {
 // ─── Real React Compiler Adapter (Dynamic) ───────────────────────────────────
 
 export class ReactCompilerAdapter implements CompilerAdapter {
-  name = 'babel-plugin-react-compiler';
-  version = 'unknown';
-  isRealCompiler = true;
+  readonly name = 'babel-plugin-react-compiler';
+  readonly version: string;
+  readonly isRealCompiler = true;
 
   constructor(version: string) {
     this.version = version;
   }
 
-  async analyse(source: string, filePath = 'inline.tsx'): Promise<CompilerObservation[]> {
+  async compile(request: CompilerCompileRequest): Promise<CompilerObservation> {
+    const startTime = performance.now();
     try {
       const babelCore: any = await import('@babel/core' as string);
       const reactCompilerPlugin: any = await import('babel-plugin-react-compiler' as string);
 
-      const result = await babelCore.transformAsync(source, {
-        filename: filePath,
+      const result = await babelCore.transformAsync(request.source, {
+        filename: request.filePath ?? 'inline.tsx',
         presets: ['@babel/preset-typescript', '@babel/preset-react'],
         plugins: [reactCompilerPlugin.default ?? reactCompilerPlugin],
       });
 
       const compiledCode = result?.code ?? '';
-      const observations: CompilerObservation[] = [];
+      const components = this.extractObservations(request.source, compiledCode);
+      const durationMs = Math.round(performance.now() - startTime);
 
-      // Parse original source to identify components/hooks
-      const ast = parse(source, { sourceType: 'unambiguous', plugins: ['jsx', 'typescript'] });
-
-      // Parse compiled output to check per-component memoization
-      let compiledAst: ReturnType<typeof parse> | null = null;
-      try {
-        compiledAst = parse(compiledCode, {
-          sourceType: 'unambiguous',
-          plugins: ['jsx'],
-        });
-      } catch {
-        // If we can't parse compiled output, fall back to string matching
+      let outcome: CompilerOutcome = 'unknown';
+      if (components.length > 0) {
+        if (components.some((c) => c.outcome === 'bailed-out')) {
+          outcome = 'bailed-out';
+        } else if (components.some((c) => c.outcome === 'skipped')) {
+          outcome = 'skipped';
+        } else if (components.every((c) => c.outcome === 'optimized')) {
+          outcome = 'optimized';
+        }
       }
 
-      // Collect compiled function names that contain memoization markers
-      const memoizedFunctions = new Set<string>();
-      if (compiledAst) {
-        traverse(compiledAst, {
-          Function(cPath: NodePath<t.Function>) {
-            let fnName: string | null = null;
-            if ('id' in cPath.node && cPath.node.id && 'name' in cPath.node.id) {
-              fnName = cPath.node.id.name;
-            } else if (cPath.parentPath?.isVariableDeclarator()) {
-              const id = cPath.parentPath.node.id;
-              if (id.type === 'Identifier') fnName = id.name;
-            }
-            if (!fnName) return;
-
-            // Check this specific function body for memoization markers
-            const fnCode = compiledCode.slice(cPath.node.start ?? 0, cPath.node.end ?? 0);
-            if (fnCode.includes('_c(') || fnCode.includes('useMemoCache')) {
-              memoizedFunctions.add(fnName);
-            }
+      return {
+        fixtureId: request.fixtureId,
+        compilerVersion: this.version,
+        outcome,
+        executionStatus: 'success',
+        observationSource: 'react-compiler',
+        diagnostics: [],
+        components,
+        durationMs,
+      };
+    } catch (err) {
+      const durationMs = Math.round(performance.now() - startTime);
+      return {
+        fixtureId: request.fixtureId,
+        compilerVersion: this.version,
+        outcome: 'unknown',
+        executionStatus: 'error',
+        observationSource: 'react-compiler',
+        diagnostics: [
+          {
+            message: err instanceof Error ? err.message : String(err),
+            severity: 'error',
           },
-        });
-      }
+        ],
+        components: [],
+        durationMs,
+      };
+    }
+  }
 
-      traverse(ast, {
-        Function(path: NodePath<t.Function>) {
-          let name: string | null = null;
-          if ('id' in path.node && path.node.id && 'name' in path.node.id) name = path.node.id.name;
-          else if (path.parentPath?.isVariableDeclarator() && path.parentPath.node.id.type === 'Identifier') {
-            name = path.parentPath.node.id.name;
+  private extractObservations(source: string, compiledCode: string): ComponentObservation[] {
+    const observations: ComponentObservation[] = [];
+
+    // Parse original source to identify components/hooks
+    const ast = parse(source, { sourceType: 'unambiguous', plugins: ['jsx', 'typescript'] });
+
+    // Parse compiled output to check per-component memoization
+    let compiledAst: ReturnType<typeof parse> | null = null;
+    try {
+      compiledAst = parse(compiledCode, {
+        sourceType: 'unambiguous',
+        plugins: ['jsx'],
+      });
+    } catch {
+      // Fallback
+    }
+
+    const memoizedFunctions = new Set<string>();
+    if (compiledAst) {
+      traverse(compiledAst, {
+        Function(cPath: NodePath<t.Function>) {
+          let fnName: string | null = null;
+          if ('id' in cPath.node && cPath.node.id && 'name' in cPath.node.id) {
+            fnName = cPath.node.id.name;
+          } else if (cPath.parentPath?.isVariableDeclarator()) {
+            const id = cPath.parentPath.node.id;
+            if (id.type === 'Identifier') fnName = id.name;
           }
+          if (!fnName) return;
 
-          if (!name || (!/^[A-Z]/.test(name) && !/^use[A-Z]/.test(name))) return;
-
-          // Per-component optimization check
-          const isMemoized = compiledAst
-            ? memoizedFunctions.has(name)
-            : (compiledCode.includes(`_c(`) || compiledCode.includes(`useMemoCache`));
-
-          observations.push({
-            componentName: name,
-            outcome: isMemoized ? 'optimized' : 'bailed-out',
-            observationSource: 'react-compiler',
-            compilerVersion: this.version,
-          });
+          const fnCode = compiledCode.slice(cPath.node.start ?? 0, cPath.node.end ?? 0);
+          if (fnCode.includes('_c(') || fnCode.includes('useMemoCache')) {
+            memoizedFunctions.add(fnName);
+          }
         },
       });
+    }
 
-      return observations;
-    } catch {
+    traverse(ast, {
+      Function(path: NodePath<t.Function>) {
+        let name: string | null = null;
+        if ('id' in path.node && path.node.id && 'name' in path.node.id) name = path.node.id.name;
+        else if (path.parentPath?.isVariableDeclarator() && path.parentPath.node.id.type === 'Identifier') {
+          name = path.parentPath.node.id.name;
+        }
+
+        if (!name || (!/^[A-Z]/.test(name) && !/^use[A-Z]/.test(name))) return;
+
+        const isMemoized = compiledAst
+          ? memoizedFunctions.has(name)
+          : (compiledCode.includes(`_c(`) || compiledCode.includes(`useMemoCache`));
+
+        observations.push({
+          componentName: name,
+          outcome: isMemoized ? 'optimized' : 'bailed-out',
+          observationSource: 'react-compiler',
+          compilerVersion: this.version,
+        });
+      },
+    });
+
+    return observations;
+  }
+
+  async analyse(source: string, filePath = 'inline.tsx'): Promise<CompilerObservation[]> {
+    const res = await this.compile({ fixtureId: 'inline', source, filePath });
+    if (res.executionStatus === 'error') {
       const fallback = new ReferenceCompilerAdapter();
       return fallback.analyse(source, filePath);
     }
+    return res.components ?? [];
+  }
+}
+
+// ─── Mock Compiler Adapter (for tests) ────────────────────────────────────────
+
+export interface MockCompilerAdapterOptions {
+  name?: string;
+  version?: string;
+  isRealCompiler?: boolean;
+  simulatedOutcome?: CompilerOutcome;
+  shouldFail?: boolean;
+  shouldTimeout?: boolean;
+  customObservations?: Map<string, CompilerObservation>;
+}
+
+export class MockCompilerAdapter implements CompilerAdapter {
+  readonly name: string;
+  readonly version: string;
+  readonly isRealCompiler: boolean;
+  private simulatedOutcome?: CompilerOutcome;
+  private shouldFail?: boolean;
+  private shouldTimeout?: boolean;
+  private customObservations?: Map<string, CompilerObservation>;
+
+  constructor(options: MockCompilerAdapterOptions = {}) {
+    this.name = options.name ?? 'MockCompiler';
+    this.version = options.version ?? '0.0.0-mock';
+    this.isRealCompiler = options.isRealCompiler ?? false;
+    this.simulatedOutcome = options.simulatedOutcome;
+    this.shouldFail = options.shouldFail;
+    this.shouldTimeout = options.shouldTimeout;
+    this.customObservations = options.customObservations;
+  }
+
+  async compile(request: CompilerCompileRequest): Promise<CompilerObservation> {
+    if (this.shouldTimeout) {
+      return {
+        fixtureId: request.fixtureId,
+        compilerVersion: this.version,
+        outcome: 'unknown',
+        executionStatus: 'timeout',
+        observationSource: 'reference-model',
+        diagnostics: [{ message: 'Compilation timed out after limit', severity: 'error' }],
+        components: [],
+        durationMs: 5000,
+      };
+    }
+
+    if (this.shouldFail) {
+      return {
+        fixtureId: request.fixtureId,
+        compilerVersion: this.version,
+        outcome: 'unknown',
+        executionStatus: 'error',
+        observationSource: 'reference-model',
+        diagnostics: [{ message: 'Simulated compiler crash / internal error', severity: 'error' }],
+        components: [],
+        durationMs: 1,
+      };
+    }
+
+    if (this.customObservations && this.customObservations.has(request.fixtureId)) {
+      return this.customObservations.get(request.fixtureId)!;
+    }
+
+    const outcome = this.simulatedOutcome ?? 'optimized';
+    return {
+      fixtureId: request.fixtureId,
+      compilerVersion: this.version,
+      outcome,
+      executionStatus: 'success',
+      observationSource: 'reference-model',
+      diagnostics: [],
+      components: [
+        {
+          componentName: 'MockComponent',
+          outcome,
+          observationSource: 'reference-model',
+          compilerVersion: this.version,
+        },
+      ],
+      durationMs: 2,
+    };
+  }
+
+  async analyse(source: string, filePath?: string): Promise<CompilerObservation[]> {
+    const obs = await this.compile({ fixtureId: 'inline', source, filePath });
+    return obs.components ?? [];
   }
 }
 
