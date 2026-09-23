@@ -31,6 +31,15 @@ import { runCompilerCompatibility } from './compiler/fixture-runner.js';
 import { printCompilerCompatReport } from './reporters/compiler-compat-terminal.js';
 import { generateCompilerCompatJsonReport } from './reporters/compiler-compat-json.js';
 
+// Ground Truth runner layer
+import {
+  runGroundTruthSuite,
+  writeGroundTruthReports,
+  loadGroundTruthBaseline,
+  checkGroundTruthRegression,
+  type GroundTruthSuiteResult,
+} from './compiler/index.js';
+
 // ─── Version ──────────────────────────────────────────────────────────────────
 
 function getVersion(): string {
@@ -59,10 +68,22 @@ ${pc.bold('USAGE')}
 
 ${pc.bold('COMMANDS')}
   ${pc.cyan('compiler-report')} [target]   Run compiler preflight analysis ${pc.dim('(recommended)')}
+  ${pc.cyan('ground-truth')} [fixtures]    Run Ground Truth fixture runner against React Compiler
   ${pc.cyan('compiler-compat')} [dir]      Run compiler compatibility suite
   ${pc.cyan('scan')} [target]              Legacy file-level scan
 
   If no command is given, runs the legacy scan interactively.
+
+${pc.bold('GROUND-TRUTH OPTIONS')}
+  --fixtures=<path>            Directory containing fixtures (default: tests/fixtures)
+  --fixture=<id>               Run a single fixture by id
+  --json                       Output result as JSON to stdout
+  --mismatches-only            Display only fixtures with classification mismatches
+  --concurrency=<n>            Fixture runner concurrency (default: 1)
+  --report=<path>              Write reports to custom path (writes latest/summary/mismatches)
+  --ci                         Enable CI mode
+  --min-agreement=<n>          CI: minimum agreement percentage (default: 80)
+  --baseline=<path>            CI: check against saved baseline file
 
 ${pc.bold('COMPILER-REPORT OPTIONS')}
   --explain                    Show detailed per-violation explanations
@@ -99,6 +120,9 @@ ${pc.bold('CONFIG FILE')}
   ${pc.dim('}')}
 
 ${pc.bold('EXAMPLES')}
+  ${pc.dim('$')} npx pure-react-check ground-truth
+  ${pc.dim('$')} npx pure-react-check ground-truth --fixtures tests/fixtures --report reports/ground-truth/latest.json
+  ${pc.dim('$')} npx pure-react-check ground-truth --fixture render-mutation
   ${pc.dim('$')} npx pure-react-check compiler-report ./src
   ${pc.dim('$')} npx pure-react-check compiler-report ./src --explain
   ${pc.dim('$')} npx pure-react-check compiler-report ./src --ci --max-bailouts=0
@@ -491,6 +515,205 @@ async function runCompilerCompatCli(args: string[]): Promise<number> {
   return 0;
 }
 
+// ─── ground-truth subcommand ──────────────────────────────────────────────────
+
+interface GroundTruthCliOptions {
+  fixturesDir?: string;
+  fixture?: string;
+  json: boolean;
+  mismatchesOnly: boolean;
+  concurrency?: number;
+  report?: string;
+  ci: boolean;
+  minAgreement: number;
+  baseline?: string;
+}
+
+function parseGroundTruthOptions(args: string[]): GroundTruthCliOptions {
+  let fixturesDir: string | undefined;
+  let fixture: string | undefined;
+  let json = false;
+  let mismatchesOnly = false;
+  let concurrency: number | undefined;
+  let report: string | undefined;
+  let ci = false;
+  let minAgreement = 80;
+  let baseline: string | undefined;
+
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === '--json') {
+      json = true;
+    } else if (arg === '--mismatches-only') {
+      mismatchesOnly = true;
+    } else if (arg === '--ci') {
+      ci = true;
+    } else if (arg === '--fixtures' || arg.startsWith('--fixtures=')) {
+      fixturesDir = arg.includes('=') ? arg.slice(arg.indexOf('=') + 1) : args[++i];
+    } else if (arg === '--fixture' || arg.startsWith('--fixture=')) {
+      fixture = arg.includes('=') ? arg.slice(arg.indexOf('=') + 1) : args[++i];
+    } else if (arg === '--concurrency' || arg.startsWith('--concurrency=')) {
+      const val = arg.includes('=') ? arg.slice(arg.indexOf('=') + 1) : args[++i];
+      concurrency = Number(val);
+    } else if (arg === '--report' || arg.startsWith('--report=')) {
+      report = arg.includes('=') ? arg.slice(arg.indexOf('=') + 1) : args[++i];
+    } else if (arg === '--min-agreement' || arg.startsWith('--min-agreement=')) {
+      const val = arg.includes('=') ? arg.slice(arg.indexOf('=') + 1) : args[++i];
+      minAgreement = Number(val);
+    } else if (arg === '--baseline' || arg.startsWith('--baseline=')) {
+      baseline = arg.includes('=') ? arg.slice(arg.indexOf('=') + 1) : args[++i];
+    } else if (!arg.startsWith('--')) {
+      fixturesDir = arg;
+    }
+  }
+
+  return {
+    fixturesDir,
+    fixture,
+    json,
+    mismatchesOnly,
+    concurrency,
+    report,
+    ci,
+    minAgreement,
+    baseline,
+  };
+}
+
+function printGroundTruthReport(
+  result: GroundTruthSuiteResult,
+  options: { mismatchesOnly?: boolean } = {},
+): void {
+  console.log(`\n${pc.bold('pure-react-check')} ${pc.dim('Ground Truth Fixture Runner')}`);
+  console.log(`${pc.dim('─'.repeat(60))}`);
+  console.log(
+    `Compiler:   ${pc.cyan(result.compilerName)} ${pc.dim(`v${result.compilerVersion}`)}`,
+  );
+  console.log(`Analyzer:   ${pc.cyan('pure-react-check')} ${pc.dim(`v${result.analyzerVersion}`)}`);
+  console.log(`Fixtures:   ${pc.bold(String(result.summary.total))}`);
+  console.log(`${pc.dim('─'.repeat(60))}\n`);
+
+  const fixturesToDisplay = options.mismatchesOnly
+    ? result.fixtures.filter((f) => f.compatibility.classification !== 'agreement')
+    : result.fixtures;
+
+  if (fixturesToDisplay.length === 0) {
+    if (options.mismatchesOnly) {
+      console.log(pc.green('✓ No mismatches found across all fixtures!'));
+    } else {
+      console.log(pc.yellow('No fixtures executed.'));
+    }
+  } else {
+    console.log(
+      `${pc.bold('FIXTURE'.padEnd(28))} ${pc.bold('PREDICTED'.padEnd(14))} ${pc.bold('ACTUAL'.padEnd(14))} ${pc.bold('CLASSIFICATION')}`,
+    );
+    console.log(pc.dim('─'.repeat(74)));
+
+    for (const res of fixturesToDisplay) {
+      const id = res.fixture.id.padEnd(28);
+      const pred = res.prediction.outcome.padEnd(14);
+      const obs = res.observation.outcome.padEnd(14);
+
+      let classStr: string;
+      switch (res.compatibility.classification) {
+        case 'agreement':
+          classStr = pc.green('AGREEMENT');
+          break;
+        case 'false-positive':
+          classStr = pc.yellow('FALSE-POSITIVE');
+          break;
+        case 'false-negative':
+          classStr = pc.red('FALSE-NEGATIVE');
+          break;
+        case 'unknown':
+        default:
+          classStr = pc.dim('UNKNOWN');
+          break;
+      }
+
+      console.log(`${id} ${pred} ${obs} ${classStr}`);
+      if (res.compatibility.classification !== 'agreement' && res.compatibility.details) {
+        console.log(`  ${pc.dim('↳')} ${pc.dim(res.compatibility.details)}`);
+      }
+    }
+    console.log(pc.dim('─'.repeat(74)));
+  }
+
+  // Summary
+  const { summary } = result;
+  const rateColor = summary.agreementRate >= 80 ? pc.green : pc.yellow;
+
+  console.log(`\n${pc.bold('SUMMARY')}`);
+  console.log(`  Total:            ${summary.total}`);
+  console.log(`  Agreement:        ${pc.green(String(summary.agreement))} (${rateColor(`${summary.agreementRate.toFixed(1)}%`)})`);
+  console.log(`  False Positives:  ${summary.falsePositives > 0 ? pc.yellow(String(summary.falsePositives)) : '0'}`);
+  console.log(`  False Negatives:  ${summary.falseNegatives > 0 ? pc.red(String(summary.falseNegatives)) : '0'}`);
+  console.log(`  Unknown:          ${summary.unknown > 0 ? pc.dim(String(summary.unknown)) : '0'}`);
+  console.log();
+}
+
+async function runGroundTruthCli(args: string[]): Promise<number> {
+  const opts = parseGroundTruthOptions(args);
+  const result = await runGroundTruthSuite({
+    fixturesDir: opts.fixturesDir,
+    fixtureId: opts.fixture,
+    concurrency: opts.concurrency,
+  });
+
+  const written = writeGroundTruthReports(result, {
+    reportPath: opts.report,
+  });
+
+  if (opts.json) {
+    console.log(JSON.stringify(result, null, 2));
+  } else {
+    printGroundTruthReport(result, { mismatchesOnly: opts.mismatchesOnly });
+    console.log(pc.dim(`Reports generated:`));
+    console.log(`  ${pc.dim('Latest:')}     ${pc.green(written.latestPath)}`);
+    console.log(`  ${pc.dim('Summary:')}    ${pc.green(written.summaryPath)}`);
+    console.log(`  ${pc.dim('Mismatches:')} ${pc.green(written.mismatchesPath)}\n`);
+  }
+
+  let ciFailed = false;
+
+  if (opts.baseline) {
+    const base = loadGroundTruthBaseline(opts.baseline);
+    if (!base) {
+      console.error(pc.red(`✗ Baseline file not found at: ${opts.baseline}`));
+      if (opts.ci) ciFailed = true;
+    } else {
+      const regression = checkGroundTruthRegression(result, base);
+      if (regression.hasRegression) {
+        console.error(pc.red(`✗ Regression detected against baseline:`));
+        for (const reason of regression.reasons) {
+          console.error(`  - ${pc.red(reason)}`);
+        }
+        if (opts.ci) ciFailed = true;
+      } else {
+        console.log(pc.green('✓ No regressions detected against baseline.\n'));
+      }
+    }
+  }
+
+  if (opts.ci) {
+    if (result.summary.agreementRate < opts.minAgreement) {
+      console.error(
+        pc.red(
+          `✗ CI failed: agreement rate ${result.summary.agreementRate.toFixed(1)}% ` +
+          `is below min-agreement threshold of ${opts.minAgreement}%.`,
+        ),
+      );
+      ciFailed = true;
+    }
+    if (!ciFailed) {
+      console.log(pc.green('✓ CI ground truth checks passed.\n'));
+    }
+    return ciFailed ? 1 : 0;
+  }
+
+  return 0;
+}
+
 // ─── Main CLI entry ───────────────────────────────────────────────────────────
 
 export async function runCli(args: string[] = process.argv.slice(2)): Promise<number> {
@@ -507,6 +730,10 @@ export async function runCli(args: string[] = process.argv.slice(2)): Promise<nu
 
   if (args[0] === 'compiler-report') {
     return runCompilerReportCli(args.slice(1));
+  }
+
+  if (args[0] === 'ground-truth') {
+    return runGroundTruthCli(args.slice(1));
   }
 
   if (args[0] === 'compiler-compat') {

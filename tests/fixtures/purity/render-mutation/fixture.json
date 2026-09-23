@@ -1,0 +1,6 @@
+{
+  "id": "render-mutation",
+  "category": "purity",
+  "description": "Mutating an outer variable during render",
+  "entry": "input.tsx"
+}

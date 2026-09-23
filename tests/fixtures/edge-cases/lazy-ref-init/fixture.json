@@ -1,0 +1,6 @@
+{
+  "id": "lazy-ref-init",
+  "category": "edge-cases",
+  "description": "Permissible lazy initialization of ref.current during render",
+  "entry": "input.tsx"
+}

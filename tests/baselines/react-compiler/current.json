@@ -1,0 +1,9 @@
+{
+  "compilerVersion": "19.0.0-reference",
+  "total": 6,
+  "agreementRate": 83.3,
+  "falsePositives": 0,
+  "falseNegatives": 1,
+  "unknown": 0,
+  "updatedAt": "2026-09-23T20:00:00.000Z"
+}

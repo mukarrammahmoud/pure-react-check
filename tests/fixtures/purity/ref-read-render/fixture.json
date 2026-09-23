@@ -1,0 +1,6 @@
+{
+  "id": "ref-read-render",
+  "category": "purity",
+  "description": "Reading ref.current during render phase",
+  "entry": "input.tsx"
+}

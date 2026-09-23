@@ -39,8 +39,9 @@
     "dev": "tsx src/index.ts",
     "build": "tsup src/index.ts src/api.ts src/compiler/index.ts src/bailout/analyser.ts --format esm --clean && tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
-    "test": "pnpm typecheck && node --import tsx/esm --test tests/bailout.test.ts tests/compiler-compat.test.ts",
+    "test": "pnpm typecheck && node --import tsx/esm --test tests/bailout.test.ts tests/compiler-compat.test.ts tests/ground-truth.test.ts",
     "test:compiler-compat": "node --import tsx/esm --test tests/compiler-compat.test.ts",
+    "test:ground-truth": "node --import tsx/esm --test tests/ground-truth.test.ts",
     "prepublishOnly": "pnpm build"
   },
   "keywords": [

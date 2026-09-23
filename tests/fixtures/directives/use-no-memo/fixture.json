@@ -1,0 +1,6 @@
+{
+  "id": "use-no-memo",
+  "category": "directives",
+  "description": "Explicit opt-out using the use no memo directive",
+  "entry": "input.tsx"
+}

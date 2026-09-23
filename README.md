@@ -100,7 +100,27 @@ npx pure-react-check compiler-report [target] [options]
 | `--baseline` | Capture a readiness baseline snapshot |
 | `--diff` | Compare current scan against saved baseline |
 
-### `compiler-compat` — Compatibility Suite
+### `ground-truth` — Ground Truth Fixture Runner
+
+Execute static predictions from `pure-react-check`, run the React Compiler via `CompilerAdapter`, compare results, and generate deterministic compatibility reports. See [Ground Truth Documentation](docs/ground-truth.md) for full details.
+
+```bash
+npx pure-react-check ground-truth [fixtures] [options]
+```
+
+| Option | Description |
+|---|---|
+| `--fixtures=<path>` | Directory containing fixtures (default: `tests/fixtures`) |
+| `--fixture=<id>` | Run a single fixture by ID |
+| `--json` | Output suite results as JSON |
+| `--mismatches-only` | Display only fixtures with classification mismatches |
+| `--concurrency=<n>` | Runner concurrency (default: `1`, sequential) |
+| `--report=<path>` | Output path for JSON report (writes `latest`, `summary`, `mismatches`) |
+| `--ci` | Enable CI mode (exit 1 on threshold failure or regression) |
+| `--min-agreement=<n>` | CI: minimum agreement rate (default: `80`) |
+| `--baseline=<path>` | CI: verify results against a saved baseline snapshot |
+
+### `compiler-compat` — Compatibility Suite (Legacy)
 
 ```bash
 npx pure-react-check compiler-compat [dir] [options]
