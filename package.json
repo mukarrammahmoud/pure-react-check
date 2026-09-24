@@ -30,7 +30,8 @@
   "files": [
     "dist",
     "bin",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "publishConfig": {
     "access": "public"
@@ -44,6 +45,14 @@
     "test:ground-truth": "node --import tsx/esm --test tests/ground-truth.test.ts",
     "prepublishOnly": "pnpm build"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mukarrammahmoud/pure-react-check.git"
+  },
+  "bugs": {
+    "url": "https://github.com/mukarrammahmoud/pure-react-check/issues"
+  },
+  "homepage": "https://github.com/mukarrammahmoud/pure-react-check#readme",
   "keywords": [
     "react",
     "react-compiler",
