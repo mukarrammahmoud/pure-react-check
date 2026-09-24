@@ -28,7 +28,7 @@ export interface FixtureRunnerOptions {
   adapter?: CompilerAdapter;
 }
 
-const TOOL_VERSION = '1.2.0';
+const TOOL_VERSION = '1.3.2';
 const SCHEMA_VERSION = 1;
 
 export async function runCompilerCompatibility(
