@@ -28,7 +28,7 @@ export interface FixtureRunnerOptions {
   adapter?: CompilerAdapter;
 }
 
-const TOOL_VERSION = '1.3.2';
+const TOOL_VERSION = '1.3.3';
 const SCHEMA_VERSION = 1;
 
 export async function runCompilerCompatibility(
@@ -121,8 +121,8 @@ export async function runCompilerCompatibility(
 
       entry.status =
         entry.mismatch > 0 ? 'REVIEW' :
-        entry.notComparable > 0 ? 'NOT-COMPARABLE' :
-        entry.agreement > 0 ? 'MATCH' : 'UNKNOWN';
+          entry.notComparable > 0 ? 'NOT-COMPARABLE' :
+            entry.agreement > 0 ? 'MATCH' : 'UNKNOWN';
     }
   }
 

@@ -153,7 +153,7 @@ describe('Compiler Compatibility Suite', () => {
       const report = await runCompilerCompatibility();
 
       assert.equal(report.schemaVersion, 1);
-      assert.equal(report.toolVersion, '1.3.2');
+      assert.equal(report.toolVersion, '1.3.3');
       assert.ok(report.compilerVersion);
       assert.ok(report.observationSource);
       assert.ok(report.summary.totalFixtures > 0);

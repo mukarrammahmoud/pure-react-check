@@ -15,7 +15,7 @@ import type {
   StaticPrediction,
 } from './types.js';
 
-const ANALYZER_VERSION = '1.3.2';
+const ANALYZER_VERSION = '1.3.3';
 
 /**
  * Maps a pure-react-check static prediction status to a standardized CompilerOutcome.

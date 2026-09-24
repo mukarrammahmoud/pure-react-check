@@ -29,7 +29,7 @@ import {
   type DetectionConfidence,
 } from './types.js';
 
-const TOOL_VERSION = '1.3.2';
+const TOOL_VERSION = '1.3.3';
 
 // ─── Annotation ───────────────────────────────────────────────────────────────
 
@@ -97,10 +97,10 @@ function buildPrediction(
 
   const outcome =
     status === 'ready' ? 'ready' :
-    status === 'predicted-bailout' ? 'bailout' :
-    status === 'at-risk' ? 'at-risk' :
-    status === 'opted-out' ? 'opted-out' :
-    'forced-opt-in';
+      status === 'predicted-bailout' ? 'bailout' :
+        status === 'at-risk' ? 'at-risk' :
+          status === 'opted-out' ? 'opted-out' :
+            'forced-opt-in';
 
   return {
     outcome,
@@ -138,7 +138,7 @@ function componentWeight(comp: ComponentBailoutSummary): number {
         Record<DetectionConfidence, number>
       > = {
         definite: { high: 1.0, medium: 0.9, low: 0.75 },
-        likely:   { high: 0.6, medium: 0.5, low: 0.4 },
+        likely: { high: 0.6, medium: 0.5, low: 0.4 },
         possible: { high: 0.3, medium: 0.2, low: 0.1 },
       };
       const likelihoodOrder: BailoutLikelihood[] = ['definite', 'likely', 'possible'];
