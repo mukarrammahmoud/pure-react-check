@@ -29,7 +29,7 @@ export interface GroundTruthSuiteOptions {
 }
 
 const SUITE_SCHEMA_VERSION = 1;
-const ANALYZER_VERSION = '1.3.0';
+const ANALYZER_VERSION = '1.3.3';
 
 export class GroundTruthSuiteRunner {
   private readonly loader: FixtureLoader;
